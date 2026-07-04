@@ -1,6 +1,6 @@
-# Jarvis – optionale Python-Abhängigkeiten für den Aktions-Server (tools/action-server.py).
-# Der Kern läuft mit reiner Standardbibliothek; diese Pakete schalten zusätzliche Fähigkeiten frei.
-# Jedes Feature degradiert sauber, wenn das zugehörige Paket fehlt (siehe GET /capabilities).
+# Jarvis – Python-Abhängigkeiten für Aktions-Server (tools/action-server.py) und Whisper-STT.
+# Wird von setup.bat installiert (bzw. `pip install -r frontend/requirements.txt`).
+# Fehlt ein Paket doch einmal, degradiert das betroffene Feature sauber (siehe GET /capabilities).
 
 psutil            # Systeminfo (CPU/RAM/Akku/Disk), Netzwerk
 pillow            # Screenshots + Skalierung (Vision, see_screen)
@@ -9,8 +9,8 @@ pyautogui         # Maus/Tastatur-Steuerung, autonomer Agent-Loop (agent_task)
 pyperclip         # Zwischenablage lesen/schreiben
 pygetwindow       # Fensterliste / Fenster-Management (optional)
 
-faster-whisper    # lokales STT (Offline-Spracherkennung, tools/stt-server.py) – optional
-                  # webm/ogg brauchen zusätzlich ffmpeg im PATH; WAV geht ohne. Modell wird autom. geladen.
+faster-whisper    # lokales STT (Offline-Spracherkennung, tools/stt-server.py)
+                  # Die App sendet WAV – ffmpeg ist NICHT nötig. Modell wird autom. geladen.
 
-# TTS (XTTS-v2) und Z-Image laufen in eigenen venvs (tools/tts-venv, tools/zimage-venv)
-# und werden separat installiert – siehe README.
+# TTS (XTTS-v2) und Z-Image laufen in eigenen venvs (tools/tts-venv, tools/zimage-venv);
+# setup.bat legt beide an – Details im README.

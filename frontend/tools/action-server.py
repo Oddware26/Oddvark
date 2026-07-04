@@ -50,7 +50,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("JARVIS_ACTION_PORT", "7864"))
-VISION_MODEL = os.environ.get("JARVIS_VISION_MODEL", "qwen2.5vl:32b")
+VISION_MODEL = os.environ.get("JARVIS_VISION_MODEL", "qwen2.5vl:7b")  # ggf. via config.json "vision_model" ueberschrieben (s. u.)
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
@@ -124,6 +124,9 @@ def load_config():
 
 
 CONFIG = load_config()
+# Vision-Modell: Umgebungsvariable schlaegt config.json schlaegt Default (qwen2.5vl:7b).
+if not os.environ.get("JARVIS_VISION_MODEL") and CONFIG.get("vision_model"):
+    VISION_MODEL = str(CONFIG["vision_model"])
 APP_WHITELIST = CONFIG.get("app_whitelist", {})
 ALLOWED_DOMAINS = CONFIG.get("allowed_domains", [])
 SMTP = CONFIG.get("smtp", {})

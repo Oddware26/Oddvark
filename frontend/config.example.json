@@ -29,6 +29,9 @@
     "send_email"
   ],
 
+  "_vision_hinweis": "Ollama-Modell fuer Bildschirm-Sehen (see_screen). Standard: qwen2.5vl:7b (zieht setup.bat). Mehr VRAM? qwen2.5vl:32b ist deutlich besser.",
+  "vision_model": "qwen2.5vl:7b",
+
   "_whisper_hinweis": "Lokale Spracherkennung (tools/stt-server.py, faster-whisper). model_size: tiny|base|small|medium|large-v3. device: auto|cpu|cuda (auto = GPU falls verfuegbar). language: null = automatische Erkennung, sonst z. B. \"de\". Modell wird beim ersten Einsatz autom. heruntergeladen.",
   "whisper": {
     "model_size": "base",

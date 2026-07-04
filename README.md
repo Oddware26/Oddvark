@@ -2,7 +2,7 @@
 
 **Your own AI assistant — 100% local, private, and agentic. Runs in your browser, powered by Ollama.**
 
-Jarvis is a fully local, privacy-first personal assistant that runs on your own PC. It pairs a polished, modern chat interface with a local LLM backend ([Ollama](https://ollama.com)) — nothing is ever sent to the cloud. But Jarvis is more than a chatbot: with its optional action server it becomes a real *work beast* that can see your screen, open apps, run commands, build entire websites, search the web, and complete multi-step tasks on your machine — always asking before it does anything risky.
+Jarvis is a fully local, privacy-first personal assistant that runs on your own PC. It pairs a polished, modern chat interface with a local LLM backend ([Ollama](https://ollama.com)) — nothing is ever sent to the cloud. But Jarvis is more than a chatbot: its action server makes it a real *work beast* that can see your screen, open apps, run commands, build entire websites, search the web, and complete multi-step tasks on your machine — always asking before it does anything risky.
 
 <p align="center">
   <img src="docs/images/chat.png" alt="Jarvis — a fully local AI chat with Markdown-rich answers" width="90%">
@@ -39,13 +39,13 @@ Jarvis is a fully local, privacy-first personal assistant that runs on your own 
 - **Scan my PC** — reads your real hardware (CPU / RAM / GPU / VRAM) and recommends the best-fitting models, with an optional live tokens/sec benchmark
 - Streams the full HuggingFace GGUF library on scroll
 
-**Agentic "work beast" abilities** *(full mode)*
+**Agentic "work beast" abilities**
 - 🖥️ **See your screen** — screenshot + a local vision model (e.g. `qwen2.5vl`) describes it or answers questions
 - 🚀 Open apps & websites, type text, control media & volume, read system info
 - 🛠️ Run shell commands and create files or entire websites (rendered live in the side code panel)
 - 🌐 Local web search (DuckDuckGo) and page reading
 - 🤝 Autonomously complete multi-step PC tasks
-- 🔊 Optional offline speech-to-text (Whisper), hyper-real local voices (XTTS), and local image generation (Z-Image)
+- 🔊 Offline speech-to-text (Whisper), hyper-real local voices (XTTS), and local image generation (Z-Image)
 - ✅ **Confirm-before-risky** — delete, shutdown, send email, or run command always ask first
 
 <p align="center">
@@ -66,63 +66,70 @@ Jarvis is a fully local, privacy-first personal assistant that runs on your own 
 
 ---
 
-## 🚀 Quick start
+## 🚀 Installation — everything, in three steps
 
-The **only required install is Ollama**. Python is optional and only unlocks the agentic "full mode."
+This guide installs **all** of Jarvis: chat, web search, PC control, screen vision, offline voice input (Whisper), hyper-real voices (XTTS), and local image generation (Z-Image). Plan for roughly **45–50 GB** of downloads and an **NVIDIA GPU** for the heavy parts.
 
-### Fastest — zero install
+### Windows
 
-Everything you need for chatting, the model picker, history, and settings. No web server, no Python.
-
-1. **Install Ollama** → [ollama.com](https://ollama.com) (one-click).
-2. **Pull a model:**
-   ```bash
-   ollama pull llama3.2
+1. **Install the two base tools** (each is a one-click installer):
+   - [Ollama](https://ollama.com) — runs the AI models
+   - [Python 3.10+](https://python.org) — **tick "Add python.exe to PATH"** during install
+2. **Run the setup** (double-click, or from a terminal):
+   ```bat
+   setup.bat
    ```
-3. **Open the app** — just double-click `frontend/index.html` (opens as `file://` in your browser), or run the launcher:
+   It installs everything in one go and is safe to re-run — finished steps are skipped:
+   - Ollama models: `llama3.1:8b` (chat + tools), `qwen2.5vl:7b` (screen vision), `nomic-embed-text` (Knowledge/RAG)
+   - Python packages for PC control, screenshots, clipboard, autonomous agent, and Whisper voice input
+   - The XTTS-v2 voice environment (`tools/tts-venv`, ~2 GB — the 1.8 GB voice model downloads on first use)
+   - The Z-Image environment (`tools/zimage-venv`) plus the ~31 GB Z-Image-Turbo weights into `~/Z-Image-Turbo`
+3. **Start Jarvis:**
    ```bat
    Jarvis.bat
    ```
+   All services launch automatically and the app opens at **http://localhost:8000**.
 
-> **First-time `file://` setup:** opening `index.html` directly makes your browser send requests from a `file://` origin, which Ollama blocks by default. Allow it once, then restart Ollama:
-> ```bash
-> setx OLLAMA_ORIGINS "*"      # Windows
-> export OLLAMA_ORIGINS="*"    # macOS/Linux — add to your shell rc
-> ```
-> The full-mode launchers serve the app from `localhost` (which Ollama already allows), so this step is only for the double-click path.
+### macOS / Linux
 
-That's it. Chat, the Effort slider, Customize (profile) & Knowledge (documents), the Models library, and your saved chat history all work — and persist across restarts via your browser's local storage.
+Same idea, by hand:
 
-### Full experience — optional
-
-Adds web search, PC control, screen vision, and optional voices/STT/image generation. Requires **Python 3** (most dev PCs already have it).
-
-**Windows:**
-```bat
-Jarvis.bat
-```
-> `Jarvis.bat` auto-detects Python: if it's installed you get the full experience automatically; if not, it falls back to zero-install core mode.
-
-**macOS / Linux (or Windows):**
 ```bash
-python frontend/start.py
+# 1) Base tools: install Ollama (ollama.com) and Python 3.10+, then:
+ollama pull llama3.1:8b && ollama pull qwen2.5vl:7b && ollama pull nomic-embed-text
+pip install -r frontend/requirements.txt
+
+# 2) XTTS voices (own venv)
+python3 -m venv frontend/tools/tts-venv
+frontend/tools/tts-venv/bin/pip install torch torchaudio coqui-tts
+
+# 3) Z-Image image generation (own venv + ~31 GB weights)
+python3 -m venv frontend/tools/zimage-venv
+frontend/tools/zimage-venv/bin/pip install torch torchvision diffusers transformers \
+    accelerate safetensors sentencepiece pillow "huggingface_hub[cli]"
+frontend/tools/zimage-venv/bin/hf download Tongyi-MAI/Z-Image-Turbo --local-dir ~/Z-Image-Turbo
+
+# 4) Start everything
+python3 frontend/start.py
 ```
 
-This starts the local helper servers and serves the app at **http://localhost:8000** (using `localhost` — not `file://` — so your browser remembers microphone permission).
+> **Tip:** if `from diffusers import ZImagePipeline` fails, your diffusers release predates Z-Image support — install it from GitHub: `pip install "git+https://github.com/huggingface/diffusers"`.
 
 ---
 
 ## 🔌 What runs where / ports
 
-| Service | Port | Needed for | Requires |
-| --- | --- | --- | --- |
-| **Ollama** | `11434` | Chat, all model inference | Ollama (required) |
-| App server (`serve.py`) | `8000` | Serving the app so mic permission sticks | Python 3 (full mode) |
-| Web search (`search-server.py`) | `7863` | Local DuckDuckGo search & page reading | Python 3 (stdlib) |
-| Action server (`action-server.py`) | `7864` | PC & browser control, screen vision, files | Python 3 (+ optional pip extras) |
-| Speech-to-text (`stt-server.py`) | `7865` | Offline voice input (Whisper) | Python 3 + `faster-whisper` |
-| Text-to-speech (`tts-server.py`) | `7862` | Hyper-real local voices (XTTS) | Python 3 + XTTS venv |
-| Image generation (`zimage-server.py`) | `7861` | Local image generation (Z-Image) | Python 3 + Z-Image venv |
+All of this is installed by `setup.bat` and started by `Jarvis.bat` / `start.py`:
+
+| Service | Port | Needed for |
+| --- | --- | --- |
+| **Ollama** | `11434` | Chat, all model inference |
+| App server (`serve.py`) | `8000` | Serving the app so mic permission sticks |
+| Web search (`search-server.py`) | `7863` | Local DuckDuckGo search & page reading |
+| Action server (`action-server.py`) | `7864` | PC & browser control, screen vision, files |
+| Speech-to-text (`stt-server.py`) | `7865` | Offline voice input (Whisper) |
+| Text-to-speech (`tts-server.py`) | `7862` | Hyper-real local voices (XTTS) |
+| Image generation (`zimage-server.py`) | `7861` | Local image generation (Z-Image) |
 
 All servers bind to `127.0.0.1` only. The action server is loopback-only by design.
 
@@ -165,29 +172,24 @@ Then edit `frontend/config.json`. It's read by the action server at startup and 
 
 ## 📦 Requirements
 
-- **Ollama** — *required*. [ollama.com](https://ollama.com), plus at least one pulled model (e.g. `ollama pull llama3.2`).
+- **Ollama** — [ollama.com](https://ollama.com). Runs every model locally.
+- **Python 3.10+** — powers the helper servers (web search, PC control, vision, voices, images).
 - **A modern browser** — Chrome, Edge, Firefox, or Safari.
-- **Python 3** — *optional*, only for full mode (web search, PC control, vision, voices). The core helpers use the standard library only.
-- **Optional pip extras** for extended abilities (`frontend/requirements.txt`):
-  ```bash
-  pip install -r frontend/requirements.txt
-  ```
-  - `psutil` — system info · `pillow` / `mss` — screenshots & vision · `pyautogui` — mouse/keyboard & autonomous agent · `pyperclip`, `pygetwindow` — clipboard & window management
-  - `faster-whisper` — offline speech-to-text
-  - XTTS (voices) and Z-Image (image gen) run in their own venvs (`tools/tts-venv`, `tools/zimage-venv`)
+- **Hardware** — an NVIDIA GPU (8 GB+ VRAM) is strongly recommended for vision, voices, and image generation; ~50 GB free disk for models and weights.
 
-Every optional feature degrades gracefully if its package is missing.
+Everything else (`pip` packages, the XTTS and Z-Image environments, model weights) is installed by `setup.bat` — see the installation guide above. If a package is missing anyway, the affected feature degrades gracefully instead of breaking the app.
 
 ---
 
 ## 🩺 Troubleshooting
 
 - **Stuck on "Connecting…" / no response** — Ollama isn't running. Start it (launch the Ollama app, or run `ollama serve`) and reload.
-- **"Failed to fetch" / nothing happens when you open `index.html` directly** — a `file://` page is blocked by Ollama's CORS policy. Set `OLLAMA_ORIGINS="*"` once (see the first-time note in Quick start) and restart Ollama, or use full mode (`Jarvis.bat` / `python frontend/start.py`), which serves from `localhost`.
-- **No models in the dropdown** — you haven't pulled one yet. Run `ollama pull llama3.2` (or install one from the Models page), then refresh.
-- **Microphone doesn't work** — the mic needs a real origin, not `file://`. Use full mode (`Jarvis.bat` / `python frontend/start.py`) so the app is served at `http://localhost:8000`, then allow mic access.
+- **"Failed to fetch" / nothing happens when you open `index.html` directly** — a `file://` page is blocked by Ollama's CORS policy. Always start via `Jarvis.bat` / `python frontend/start.py` (serves from `localhost`), or allow it once with `setx OLLAMA_ORIGINS "*"` and restart Ollama.
+- **No models in the dropdown** — `setup.bat` hasn't pulled them yet. Run it, or `ollama pull llama3.1:8b`, then refresh.
+- **Microphone doesn't work** — the mic needs a real origin, not `file://`. Start via `Jarvis.bat` / `python frontend/start.py` so the app is served at `http://localhost:8000`, then allow mic access.
 - **Two tabs open** — that's fine; Jarvis handles multiple tabs and shares the same local storage.
-- **A feature is missing in full mode** — it likely needs an optional package. Check the server's `GET /capabilities` and install the relevant extra from `frontend/requirements.txt`.
+- **A feature is missing** — its install step probably failed. Re-run `setup.bat` (finished steps are skipped) and check the action server's `GET /capabilities`.
+- **Screen vision answers oddly / errors** — pull the vision model (`ollama pull qwen2.5vl:7b`) or set a bigger one in `frontend/config.json` (`"vision_model": "qwen2.5vl:32b"`).
 
 ---
 
@@ -195,4 +197,4 @@ Every optional feature degrades gracefully if its package is missing.
 
 MIT © 2026 [Oddware](https://github.com/Oddware26) — see [`LICENSE`](LICENSE).
 
-Built on local, open-source models via [Ollama](https://ollama.com), with Whisper, XTTS, and Z-Image powering optional speech and image features. Bundles the [Rubik](https://github.com/googlefonts/rubik) and [OpenDyslexic](https://opendyslexic.org) fonts (SIL Open Font License) and [Hugeicons Free](https://hugeicons.com) icons (MIT) — full attributions in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). Your data stays on your machine.
+Built on local, open-source models via [Ollama](https://ollama.com), with Whisper, XTTS, and Z-Image powering the speech and image features. Bundles the [Rubik](https://github.com/googlefonts/rubik) and [OpenDyslexic](https://opendyslexic.org) fonts (SIL Open Font License) and [Hugeicons Free](https://hugeicons.com) icons (MIT) — full attributions in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). Your data stays on your machine.
