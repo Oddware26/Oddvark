@@ -76,7 +76,7 @@
   padding: 6px 2px 2px;
 }
 .jv-toolbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.jv-toolbar-right { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.jv-toolbar-right { display: flex; align-items: center; gap: 6px; margin-left: auto; min-width: 0; }
 
 /* gemeinsame Basis für die Toolbar-Buttons */
 .jv-tb-btn {
@@ -141,6 +141,10 @@
 /* Model + Effort rechts */
 .jv-tb-model, .jv-tb-effort { color: hsl(var(--text-200)); }
 .jv-tb-effort { font-weight: 400; }
+/* Modellname darf nie die linke Gruppe überlappen: schrumpfbar + Ellipsis (v. a. lange hf.co-Namen). */
+.jv-tb-model { min-width: 0; }
+.jv-tb-model span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jv-tb-effort { flex: 0 0 auto; }
 
 /* ============================== Chat-Bereich (Welcome + Transkript) ============================== */
 /* .dframe-content / .dframe-content-inner werden in theme.css positioniert (Sidebar-Abstand);

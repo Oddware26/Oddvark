@@ -13,6 +13,14 @@ Jarvis is a fully local, privacy-first personal assistant that runs on your own 
   <img src="docs/images/models.png" alt="Built-in models library with one-click install" width="49%">
 </p>
 
+<p align="center">
+  <img src="docs/images/modes.png" alt="Agentic modes — Accept changes, Plan mode, Run without asking, Auto" width="88%">
+</p>
+
+<p align="center">
+  <img src="docs/images/genius.png" alt="Effort slider — dial from Faster all the way to Genius" width="88%">
+</p>
+
 ---
 
 ## ✨ Features

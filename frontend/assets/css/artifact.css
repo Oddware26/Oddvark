@@ -5,7 +5,11 @@
    Als letztes Stylesheet geladen -> gewinnt gegen theme-ios.css.
    ============================================================================ */
 :root {
-  --jv-art-w: min(50vw, 768px);
+  /* Panelbreite: höchstens 768px – ABER so gedeckelt, dass links immer die Sidebar (288+16px)
+     UND mind. ~460px Chat bleiben, sonst wird der Composer zum unbrauchbaren Splitter.
+     WICHTIG: html trägt zoom:1.25 (siehe app.css), dadurch entspricht 80vw der echten
+     Layout-Breite (100vw wäre die visuelle Breite und würde die Rechnung um den Zoom verfälschen). */
+  --jv-art-w: min(768px, calc(80vw - var(--df-sidebar-width, 288px) - 16px - 460px));
   --jv-art-gap: 14px;
   --jv-art-curve: cubic-bezier(0.23, 1, 0.32, 1);
   --jv-art-drawer: cubic-bezier(0.32, 0.72, 0, 1);
