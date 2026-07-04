@@ -1,5 +1,5 @@
-/* Oddvark – persönlicher, lokaler KI-Assistent (Assistent-Persona/Wakeword: „Jarvis").
-   Backend: lokales Ollama (http://localhost:11434). Sprache: Web Speech API (STT + TTS). */
+/* Oddvark – personal, local AI assistant (assistant persona / wake word: "Jarvis").
+   Backend: local Ollama (http://localhost:11434). Speech: Web Speech API (STT + TTS). */
 (function () {
   "use strict";
 
@@ -7,64 +7,64 @@
   const tr = (window.JV_I18N && window.JV_I18N.t) || function (k) { return k; };
 
   const OLLAMA = "http://localhost:11434";
-  const ZIMAGE = "http://localhost:7861"; // lokaler Z-Image-Turbo Bild-Server (tools/zimage-server.py)
-  const TTSAPI = "http://localhost:7862"; // lokaler XTTS-v2 TTS-Server (tools/tts-server.py)
-  const ACTIONS = "http://127.0.0.1:7864"; // lokaler Aktions-Server (PC/Datei/Website/Vision, tools/action-server.py)
-  const STT_URL = "http://127.0.0.1:7865"; // lokaler Whisper-STT-Server (tools/stt-server.py)
+  const ZIMAGE = "http://localhost:7861"; // local Z-Image-Turbo image server (tools/zimage-server.py)
+  const TTSAPI = "http://localhost:7862"; // local XTTS-v2 TTS server (tools/tts-server.py)
+  const ACTIONS = "http://127.0.0.1:7864"; // local action server (PC/file/website/vision, tools/action-server.py)
+  const STT_URL = "http://127.0.0.1:7865"; // local Whisper STT server (tools/stt-server.py)
   const LS_MODEL = "jarvis.model";
   const LS_VOICE = "jarvis.voiceOut";
   const LS_LANG = "jarvis.lang";
   const LS_EFFORT = "jarvis.effort";
   const LS_PROFILE = "jarvis.profile";
-  // Aufwand-Stufen 0..5 -> tr("effort.N") (Stufe 5 "Ultracode" = lila Sonderzustand).
+  // Effort levels 0..5 -> tr("effort.N") (level 5 "Ultracode" = purple special state).
   const LS_MODE = "jarvis.mode";
-  // Modus-Optionen für den "Auto"-Button (Labels via tr("mode.<value>") / tr("mode.<value>.short")).
+  // Mode options for the "Auto" button (labels via tr("mode.<value>") / tr("mode.<value>.short")).
   const MODES = [
     { value: "accept" },
     { value: "plan" },
-    { value: "auto_run" },   // autonom: riskante Aktionen ohne Nachfrage ausführen
-    { value: "auto" },       // Standard – steht ganz unten
+    { value: "auto_run" },   // autonomous: run risky actions without asking
+    { value: "auto" },       // default – sits at the very bottom
   ];
-  // Text- UND Hintergrundfarbe des Modus-Buttons je Modus: grün = accept, blau = plan, rot = auto_run, gelb = auto.
+  // Text AND background color of the mode button per mode: green = accept, blue = plan, red = auto_run, yellow = auto.
   const MODE_COLORS = { accept: "var(--extended-green)", plan: "hsl(var(--accent-100))", auto_run: "var(--core-red)", auto: "var(--extended-yellow)" };
   const MODE_BG = { accept: "var(--extended-10-green)", plan: "hsl(var(--accent-100) / 0.14)", auto_run: "var(--core-10-red)", auto: "var(--extended-10-yellow)" };
-  // Sprachen für den Sprach-Schalter: Anzeige, BCP-47 (STT/TTS) und Antwortsprache fürs System-Prompt.
+  // Languages for the language switcher: display, BCP-47 (STT/TTS), and answer language for the system prompt.
   const LANGS = [
-    { code: "de", label: "Deutsch", bcp: "de-DE", answer: "Deutsch" },
-    { code: "en", label: "English", bcp: "en-US", answer: "Englisch" },
-    { code: "fr", label: "Français", bcp: "fr-FR", answer: "Französisch" },
-    { code: "es", label: "Español", bcp: "es-ES", answer: "Spanisch" },
-    { code: "it", label: "Italiano", bcp: "it-IT", answer: "Italienisch" },
+    { code: "de", label: "Deutsch", bcp: "de-DE", answer: "German" },
+    { code: "en", label: "English", bcp: "en-US", answer: "English" },
+    { code: "fr", label: "Français", bcp: "fr-FR", answer: "French" },
+    { code: "es", label: "Español", bcp: "es-ES", answer: "Spanish" },
+    { code: "it", label: "Italiano", bcp: "it-IT", answer: "Italian" },
   ];
   function langCfg() { return LANGS.find(function (l) { return l.code === lang; }) || LANGS[0]; }
 
-  // ---------- Profil / Gedächtnis („Über dich") ----------
+  // ---------- Profile / memory ("About you") ----------
   const PROFILE_DEFAULTS = {
     name: "", about: "", tone: "locker", address: "", length: "knapp",
     humor: false, instructions: "", memories: [],
     voiceURI: "", rate: 1, volume: 1, wakeWord: "Jarvis", wakeEnabled: true,
-    engine: "local", voiceLocal: "", // TTS: "local" (XTTS) | "elevenlabs" | "browser"; voiceLocal = XTTS-Sprecher
-    elevenKey: "", elevenVoice: "", elevenModel: "eleven_multilingual_v2", // ElevenLabs (eigener API-Key)
-    tools: true, // Werkzeuge (Tool-Calling über Ollama) erlauben
-    rag: false, embedModel: "nomic-embed-text", // Wissensbasis (RAG)
+    engine: "local", voiceLocal: "", // TTS: "local" (XTTS) | "elevenlabs" | "browser"; voiceLocal = XTTS speaker
+    elevenKey: "", elevenVoice: "", elevenModel: "eleven_multilingual_v2", // ElevenLabs (own API key)
+    tools: true, // allow tools (tool calling via Ollama)
+    rag: false, embedModel: "nomic-embed-text", // knowledge base (RAG)
   };
   function loadProfile() {
     let p = {};
     try { p = JSON.parse(localStorage.getItem(LS_PROFILE) || "{}") || {}; } catch (e) { p = {}; }
     const out = Object.assign({}, PROFILE_DEFAULTS, p);
     if (!Array.isArray(out.memories)) out.memories = [];
-    // Einmalig: Wake-Word standardmäßig einschalten („Hey Jarvis" -> Mikro geht direkt an).
-    // Bestehende Profile haben wakeEnabled:false gespeichert; danach zählt wieder die Nutzer-Wahl.
+    // One-time: turn the wake word on by default ("Hey Jarvis" -> mic activates immediately).
+    // Existing profiles have wakeEnabled:false stored; after this the user's choice applies again.
     if (!p.wakeDefaultOn) { out.wakeEnabled = true; out.wakeDefaultOn = true; }
     return out;
   }
   let profile = loadProfile();
-  let syncProfileUI = null; // wird vom Anpassen-Overlay gesetzt, um Felder aus `profile` neu zu rendern
+  let syncProfileUI = null; // set by the Customize overlay to re-render fields from `profile`
   function saveProfile() {
     try { localStorage.setItem(LS_PROFILE, JSON.stringify(profile)); } catch (e) {}
     if (syncProfileUI) try { syncProfileUI(); } catch (e) {}
   }
-  // "Merk dir, dass ..." -> zu merkender Fakt (oder null). Triggert das Gedächtnis ohne Modell-Aufruf.
+  // "Remember that ..." -> fact to remember (or null). Triggers the memory without a model call.
   function parseRemember(t) {
     if (!t) return null;
     const m = t.match(/^\s*(?:merke?\s+dir|notiere?(?:\s+dir)?|behalte|remember)\b[\s,:]*(?:dass\s+|that\s+)?([\s\S]+)/i);
@@ -73,7 +73,7 @@
     return fact || null;
   }
 
-  // Persönlichkeits-/Profil-/Gedächtnis-Anweisungen für den System-Prompt zusammenbauen.
+  // Assemble personality/profile/memory instructions for the system prompt.
   function profilePromptParts() {
     const p = profile, parts = [];
     const who = [];
@@ -97,17 +97,17 @@
   function systemPrompt() {
     const extra = profilePromptParts();
     let s = tr("sys.base") + " " + tr("sys.env");
-    if (profile.tools !== false) s += " " + tr("sys.agent"); // Tool-Leitfaden nur, wenn Werkzeuge aktiv
+    if (profile.tools !== false) s += " " + tr("sys.agent"); // tool guide only when tools are enabled
     if (extra.length) s += " " + extra.join(" ");
     s += " " + tr("sys.answer_in", { lang: tr("langname." + langCfg().code) });
     return s;
   }
 
-  // ---------- Anker im Grundgerüst ----------
+  // ---------- Anchors in the scaffold ----------
   const input = document.querySelector('.tiptap.ProseMirror[contenteditable="true"]');
   const scrollC = document.querySelector("[data-epitaxy-transcript-region] .overflow-y-auto");
   const sendBtn = document.getElementById("jv-send-btn") || document.querySelector('button[aria-label="Send"]') || document.querySelector('button[aria-label="Senden"]');
-  // Mikrofon: stabile Grundgerüst-ID zuerst; aria-Label-Fallbacks (EN-Standard + DE) nur als Sicherheitsnetz.
+  // Microphone: stable scaffold ID first; aria-label fallbacks (EN default + DE) only as a safety net.
   const micBtn =
     document.getElementById("base-ui-_r_kq_") ||
     document.querySelector('button[aria-label="Press and hold to record"]') ||
@@ -116,29 +116,29 @@
     document.querySelector('[role="group"][aria-label="Diktieren"] button');
 
   if (!input || !scrollC) {
-    console.warn("[Oddvark] Eingabefeld oder Transcript-Bereich nicht gefunden – Abbruch.");
+    console.warn("[Oddvark] Input field or transcript region not found – aborting.");
     return;
   }
 
-  // Begrüßung dynamisch: Name aus dem Profil (Customize); sonst Anrede; sonst nur "Welcome back".
+  // Dynamic greeting: name from the profile (Customize); otherwise the salutation; otherwise just "Welcome back".
   const welcomeH1 = document.querySelector("h1.text-title");
   const welcomeWrap = welcomeH1 && welcomeH1.closest("header");
-  if (welcomeWrap) welcomeWrap.classList.add("jv-welcome"); // aktiviert die Aus-/Einblend-Transition
+  if (welcomeWrap) welcomeWrap.classList.add("jv-welcome"); // enables the fade-out/in transition
   let welcomeGone = false;
   function updateWelcome() {
     if (!welcomeH1) return;
     const nm = (profile.name || "").trim() || (profile.address || "").trim();
     welcomeH1.textContent = nm ? tr("header.welcome_name", { name: nm }) : tr("header.welcome_plain");
   }
-  // Beim Chat-Start die Begrüßung animiert ausblenden (einmalig).
-  // Das Grundgerüst legt eine Einblend-ANIMATION auf den Header, die normale Inline-Styles schlägt; die Web Animations API
-  // (fill:forwards) überschreibt sie deterministisch, danach fixiert onfinish den Endzustand per !important.
+  // Fade the greeting out with animation when the chat starts (once).
+  // The scaffold puts a fade-in ANIMATION on the header that beats normal inline styles; the Web Animations API
+  // (fill:forwards) overrides it deterministically, then onfinish locks the end state via !important.
   function hideWelcome() {
     if (welcomeGone || !welcomeWrap) return;
     welcomeGone = true;
     const el = welcomeWrap;
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.style.setProperty("animation", "none", "important"); // Grundgerüst-Einblend-Animation abschalten
+    el.style.setProperty("animation", "none", "important"); // disable the scaffold's fade-in animation
     const cs = getComputedStyle(el);
     const h0 = el.offsetHeight;
     const lock = function () {
@@ -152,7 +152,7 @@
       st.setProperty("overflow", "hidden", "important");
       st.setProperty("pointer-events", "none", "important");
     };
-    if (!el.animate) { lock(); return; } // WAAPI nicht verfügbar -> ohne Animation ausblenden
+    if (!el.animate) { lock(); return; } // WAAPI unavailable -> hide without animation
     const anim = el.animate(
       [
         { opacity: 1, maxHeight: h0 + "px", paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, transform: "translateY(0)" },
@@ -162,7 +162,7 @@
     );
     anim.onfinish = lock;
   }
-  // Begrüßung wieder einblenden (bei "New session"). Hebt die von hideWelcome() gesetzten Sperren auf.
+  // Fade the greeting back in (on "New session"). Removes the locks set by hideWelcome().
   function showWelcome() {
     welcomeGone = false;
     if (!welcomeWrap) return;
@@ -172,41 +172,41 @@
     updateWelcome();
   }
 
-  // ---------- Zustand ----------
+  // ---------- State ----------
   const messages = []; // {role, content, images?}
-  let attachments = []; // angehängte Dateien: {name, kind:'image'|'text'|'other', dataUrl?, b64?, text?, note?}
+  let attachments = []; // attached files: {name, kind:'image'|'text'|'other', dataUrl?, b64?, text?, note?}
   let model = localStorage.getItem(LS_MODEL) || "";
-  if (model === "auto") model = ""; // Migration: Sentinel des entfernten Auto-Routers verwerfen
-  const ctxLen = {}; // Kontextfenster je Modell (aus /api/show, gecacht); Schutz vor stillem Kontextverlust
-  const modelCaps = {}; // Fähigkeiten je Modell (aus /api/show, z. B. "thinking") – für den Aufwand-Regler
+  if (model === "auto") model = ""; // migration: discard the removed auto-router's sentinel
+  const ctxLen = {}; // context window per model (from /api/show, cached); guards against silent context loss
+  const modelCaps = {}; // capabilities per model (from /api/show, e.g. "thinking") – for the effort slider
   let voiceOut = localStorage.getItem(LS_VOICE) !== "0";
-  let ttsBtn = null; // Lautsprecher-Schalter in der Bottom-Bar (neben dem Mikrofon)
-  let activeSpeakBtn = null; // gerade vorlesender Toolbar-Button (zeigt ⏸); immer nur einer
-  let lang = localStorage.getItem(LS_LANG) === "de" ? "de" : "en"; // Standard/Hauptsprache: Englisch
+  let ttsBtn = null; // speaker toggle in the bottom bar (next to the microphone)
+  let activeSpeakBtn = null; // the toolbar button currently reading aloud (shows ⏸); only ever one
+  let lang = localStorage.getItem(LS_LANG) === "de" ? "de" : "en"; // default/main language: English
   let busy = false;
-  // Es soll immer nur EIN Dropdown gleichzeitig offen sein: hier steht die close()-Funktion
-  // des aktuell offenen Popups. Jedes open() schließt zuerst das vorherige.
+  // Only ONE dropdown should be open at a time: this holds the close() function
+  // of the currently open popup. Each open() closes the previous one first.
   let closeOpenMenu = null;
-  // Aufwand: 0..5, Default 3 ("Extra"). Wird von ask() gelesen und in den /api/chat-Body übersetzt.
+  // Effort: 0..5, default 3 ("Extra"). Read by ask() and translated into the /api/chat body.
   let effort = clampEffort(parseInt(localStorage.getItem(LS_EFFORT), 10));
 
-  // ---------- Branding ---------- (Wortmarke "ODDVARK" steht direkt im HTML; Assistent-Persona bleibt „Jarvis")
+  // ---------- Branding ---------- (the "ODDVARK" wordmark is directly in the HTML; assistant persona stays "Jarvis")
   document.title = "Oddvark";
 
-  // ---------- Chat-Oberfläche aufbauen ----------
+  // ---------- Build the chat interface ----------
   scrollC.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.id = "jarvis-wrap";
   wrap.className = "epitaxy-composer-width";
   scrollC.appendChild(wrap);
 
-  // Verbindungs-Status-Pille entfernt – der Zustand (Bereit/Denkt/Fehler …) wird im
-  // Identitäts-Chip in der Sidebar gespiegelt (setAssistant), Chat-Fehler im Transkript.
-  const promptBox = input.closest(".epitaxy-prompt"); // weiterhin für die Anhang-Zeile gebraucht
+  // Connection-status pill removed – the state (Ready/Thinking/Error …) is mirrored in the
+  // identity chip in the sidebar (setAssistant), chat errors in the transcript.
+  const promptBox = input.closest(".epitaxy-prompt"); // still needed for the attachment row
 
-  // ---------- Sprachausgabe-Schalter (Lautsprecher-Icon neben dem Mikrofon) ----------
-  // Outline-Stil (fill:none + stroke) und viewBox 0 0 12 12 wie das Mic-Icon daneben -> gleiche
-  // Render-Größe (beide width:var(--class-small-icon)) UND gleicher Glyph-Füllgrad.
+  // ---------- Voice-output toggle (speaker icon next to the microphone) ----------
+  // Outline style (fill:none + stroke) and viewBox 0 0 12 12 like the mic icon beside it -> same
+  // render size (both width:var(--class-small-icon)) AND same glyph fill weight.
   const SPK_ON = HI("speakerOn", { style: "width:18px;height:18px" });
   const SPK_OFF = HI("speakerOff", { style: "width:18px;height:18px" });
 
@@ -214,7 +214,7 @@
     const micGroup = micBtn.closest('[role="group"]') || micBtn.parentElement;
     ttsBtn = document.createElement("button");
     ttsBtn.type = "button";
-    // Gleiche Optik wie die anderen Bottom-Bar-Icon-Buttons (z. B. "+") – eigene Klasse (chat.css/app.css).
+    // Same look as the other bottom-bar icon buttons (e.g. "+") – own class (chat.css/app.css).
     ttsBtn.className = "jarvis-tts-btn";
     ttsBtn.setAttribute("aria-label", tr("aria.voice_output"));
     ttsBtn.innerHTML = '<span class="jarvis-tts-ico"></span>';
@@ -225,13 +225,13 @@
       localStorage.setItem(LS_VOICE, voiceOut ? "1" : "0");
       if (!voiceOut) stopSpeak();
       renderVoiceTgl();
-      if (idChip) idChip.syncSettings(); // Switch im Einstellungs-Popover synchron halten
+      if (idChip) idChip.syncSettings(); // keep the switch in the settings popover in sync
     }, true);
     if (micGroup && micGroup.parentNode) {
       micGroup.parentNode.insertBefore(ttsBtn, micGroup.nextSibling);
     }
   }
-  // Lautsprecher-Icon + Zustand an voiceOut anpassen (ersetzt den früheren Status-Pill).
+  // Adjust the speaker icon + state to voiceOut (replaces the former status pill).
   function renderVoiceTgl() {
     if (!ttsBtn) return;
     ttsBtn.setAttribute("aria-pressed", String(voiceOut));
@@ -241,24 +241,24 @@
   }
   renderVoiceTgl();
 
-  // Pfeil/Chevron neben dem Mikrofon ("Diktat-Einstellungen") entfernen – in Oddvark ungenutzt.
+  // Remove the arrow/chevron next to the microphone ("Dictation settings") – unused in Oddvark.
   const micChevron =
     document.getElementById("base-ui-_r_ks_") ||
     document.querySelector('button[aria-label="Dictation settings"]') ||
     document.querySelector('button[aria-label="Diktat-Einstellungen"]');
   if (micChevron) micChevron.remove();
 
-  // ---------- Datei-Anhänge ("+"-Button → Dateien anhängen) ----------
+  // ---------- File attachments ("+" button → attach files) ----------
   const ATT_FILE_SVG = HI("file", { size: 14 });
   const ATT_X_SVG = HI("x", { size: 12 });
   const ATT_TEXT_EXT = /\.(txt|md|markdown|json|jsonl|csv|tsv|log|ya?ml|xml|html?|css|scss|less|js|mjs|cjs|ts|jsx|tsx|vue|svelte|py|java|kt|c|h|hpp|cpp|cc|cs|go|rs|rb|php|swift|sh|bash|zsh|bat|ps1|sql|ini|toml|cfg|conf|env|gradle|dockerfile|gitignore|r|lua|pl)$/i;
-  const ATT_MAX_TEXT = 200 * 1024; // 200 KB pro Textdatei
+  const ATT_MAX_TEXT = 200 * 1024; // 200 KB per text file
 
   const addBtn =
     document.getElementById("base-ui-_r_ki_") ||
     document.querySelector('button[aria-label="Add"]') ||
     document.querySelector('button[aria-label="Hinzufügen"]');
-  // Grundgerüst hat bereits einen versteckten Datei-Input – wiederverwenden, sonst neu anlegen.
+  // The scaffold already has a hidden file input – reuse it, otherwise create a new one.
   let fileInput = document.getElementById("chat-input-file-upload-epitaxy");
   if (!fileInput) {
     fileInput = document.createElement("input");
@@ -272,13 +272,13 @@
     "image/*,text/*,.md,.json,.csv,.log,.js,.ts,.jsx,.tsx,.py,.html,.css,.yaml,.yml,.xml,.sql,.sh,.toml,.ini"
   );
 
-  // Anhang-Karte INNERHALB der Prompt-Box: der Grundgerüst hat dafür einen ausklappbaren Grid-Slot
-  // (grid-template-rows 0fr->1fr animiert die Höhe). Dort hängen wir die Karte ein, sodass sich
-  // die Box nach oben erweitert. Fallback: lose Leiste über der Box.
+  // Attachment card INSIDE the prompt box: the scaffold has an expandable grid slot for it
+  // (grid-template-rows 0fr->1fr animates the height). We insert the card there so the box
+  // grows upward. Fallback: a loose bar above the box.
   const attachRow = el("div", "jarvis-attach");
   const attachSlot = promptBox ? promptBox.querySelector('div.grid[style*="grid-template-rows"]') : null;
   const attachSlotInner = attachSlot ? attachSlot.firstElementChild : null;
-  let collapseTimer = null; // verzögert das Leeren bis nach der Einklapp-Animation
+  let collapseTimer = null; // delays clearing until after the collapse animation
   if (attachSlotInner) {
     attachSlotInner.appendChild(attachRow);
   } else if (promptBox && promptBox.parentNode) {
@@ -290,7 +290,7 @@
 
   if (addBtn) {
     addBtn.setAttribute("aria-haspopup", "menu");
-    buildPlusMenu(addBtn); // "+" öffnet ein Menü (Bild/Websuche/Anhängen) statt direkt den Datei-Dialog
+    buildPlusMenu(addBtn); // "+" opens a menu (image/web search/attach) instead of the file dialog directly
   }
   fileInput.addEventListener("change", function () {
     Array.prototype.slice.call(fileInput.files || []).forEach(readAttachment);
@@ -324,7 +324,7 @@
       };
       r.readAsText(file);
     } else {
-      attachments.push({ name: file.name, kind: "other", note: "nicht lesbar" });
+      attachments.push({ name: file.name, kind: "other", note: "not readable" });
       renderAttachments();
     }
   }
@@ -332,8 +332,8 @@
     const has = attachments.length > 0;
     if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
     if (!has) {
-      // Einklappen MIT Animation: bestehende Karten stehen lassen, Slot auf 0fr animieren und
-      // den Inhalt erst NACH der Transition leeren (sonst verschwänden die Karten sofort).
+      // Collapse WITH animation: leave existing cards in place, animate the slot to 0fr, and
+      // clear the content only AFTER the transition (otherwise the cards would vanish instantly).
       if (attachSlot) {
         attachSlot.style.gridTemplateRows = "0fr";
         collapseTimer = setTimeout(function () {
@@ -346,13 +346,13 @@
       }
       return;
     }
-    // Es gibt Anhänge -> Karten aufbauen und Slot ausklappen.
+    // There are attachments -> build cards and expand the slot.
     attachRow.innerHTML = "";
     if (attachSlot) attachSlot.style.gridTemplateRows = "1fr";
     else attachRow.removeAttribute("hidden");
     attachments.forEach(function (a, i) {
       const chip = el("div", "jarvis-chip");
-      // Thumbnail (Bild) oder Datei-Icon
+      // Thumbnail (image) or file icon
       if (a.kind === "image") {
         const im = document.createElement("img");
         im.className = "jarvis-chip-thumb";
@@ -364,14 +364,14 @@
         ic.innerHTML = ATT_FILE_SVG;
         chip.appendChild(ic);
       }
-      // Name + Untertitel (Typ/Hinweis)
+      // Name + subtitle (type/note)
       const meta = el("div", "jarvis-chip-meta");
       const nm = el("div", "jarvis-chip-name", a.name);
       nm.title = a.name;
       const sub = el("div", "jarvis-chip-sub", a.kind === "image" ? tr("att.image") : (a.note || tr("att.file")));
       meta.append(nm, sub);
       chip.appendChild(meta);
-      // Entfernen
+      // Remove
       const x = el("button", "jarvis-chip-x");
       x.type = "button";
       x.setAttribute("aria-label", tr("aria.remove_attachment"));
@@ -382,7 +382,7 @@
     });
   }
 
-  // Bottom-Model-Button als Trigger erfassen (Platzhalter-Label "Modell" im HTML).
+  // Capture the bottom model button as the trigger (placeholder label "Modell" in the HTML).
   const modelBtn = document.getElementById("base-ui-_r_l4_");
   let modelLabelSpan = null;
   if (modelBtn) {
@@ -397,11 +397,11 @@
     modelMenu.setSelected(v);
   }, function () { window.location.href = "models.html"; });
 
-  // Bottom-"Extra"-Button (Aufwand) als Trigger erfassen – analog zu modelBtn/modelLabelSpan.
+  // Capture the bottom "Extra" button (effort) as the trigger – analogous to modelBtn/modelLabelSpan.
   let effortBtn = document.getElementById("base-ui-_r_la_");
   let effortLabelSpan = null;
   if (effortBtn) {
-    // Das Blatt-<span> im Button, dessen Text aktuell "Extra" ist.
+    // The leaf <span> in the button whose text is currently "Extra".
     Array.prototype.forEach.call(effortBtn.querySelectorAll("span"), function (n) {
       if (!effortLabelSpan && n.childElementCount === 0 && n.textContent.trim() === "Extra") {
         effortLabelSpan = n;
@@ -409,7 +409,7 @@
     });
   }
   if (!effortLabelSpan) {
-    // Fallback: irgendein Blatt-<span> mit Text "Extra", dessen Button-Anker wir übernehmen.
+    // Fallback: any leaf <span> with text "Extra" whose button anchor we take over.
     document.querySelectorAll("span").forEach(function (n) {
       if (!effortLabelSpan && n.childElementCount === 0 && n.textContent.trim() === "Extra") {
         effortLabelSpan = n;
@@ -422,11 +422,11 @@
     localStorage.setItem(LS_EFFORT, String(effort));
     updateEffortLabel(true);
   });
-  // Anfangswert in Trigger-Label und Popup spiegeln.
+  // Mirror the initial value in the trigger label and popup.
   updateEffortLabel();
   effortMenu.setValue(effort);
 
-  // Bottom-"Auto"-Button (Modus) als Trigger erfassen.
+  // Capture the bottom "Auto" button (mode) as the trigger.
   const modeBtn = document.getElementById("base-ui-_r_ka_");
   let modeLabelSpan = null;
   if (modeBtn) {
@@ -442,39 +442,39 @@
   });
   updateModeLabel();
 
-  // Composer-Icons als HugeIcons setzen (statt statischer Platzhalter) – konsistent mit dem Rest der UI.
-  // Mic, "+" und der Lautsprecher (TTS) nutzen dieselbe Standard-Icongröße (--class-small-icon) -> gleich groß.
+  // Set the composer icons as HugeIcons (instead of static placeholders) – consistent with the rest of the UI.
+  // Mic, "+" and the speaker (TTS) use the same default icon size (--class-small-icon) -> equal size.
   (function setComposerIcons() {
     const put = function (el, name, opts) { if (el) el.innerHTML = HI(name, opts); };
     put(sendBtn, "send", { size: 18 });
-    put(document.getElementById("base-ui-_r_ki_"), "plus", { size: 18 });          // Anhängen (+)
-    put(micBtn, "mic", { size: 18 });                                              // Mikrofon = Lautsprecher = +
-    put(document.getElementById("base-ui-_r_ks_"), "chevDown", { size: 14 });      // Diktat-Einstellungen (kleiner Caret)
+    put(document.getElementById("base-ui-_r_ki_"), "plus", { size: 18 });          // Attach (+)
+    put(micBtn, "mic", { size: 18 });                                              // microphone = speaker = +
+    put(document.getElementById("base-ui-_r_ks_"), "chevDown", { size: 14 });      // dictation settings (small caret)
   })();
   modeMenu.setSelected(mode);
 
-  // Oddvark-Identität in der Sidebar-Fußzeile (ersetzt das alte Account-Menü).
-  // Zeigt Präsenz + Live-Status (Bereit/Hört zu/Denkt/Spricht); Klick öffnet Einstellungen.
+  // Oddvark identity in the sidebar footer (replaces the old account menu).
+  // Shows presence + live status (Ready/Listening/Thinking/Speaking); click opens settings.
   const idChip = buildIdentityChip();
   function setAssistant(s) { if (idChip) idChip.setState(s); }
 
 
-  // ---------- Helfer ----------
+  // ---------- Helpers ----------
   function el(tag, cls, text) {
     const n = document.createElement(tag);
     if (cls) n.className = cls;
     if (text != null) n.textContent = text;
     return n;
   }
-  // `cmdText`: Original-Eingabe inkl. Slash-Befehl (Bubble zeigt z. B. bei /web nur die Frage) –
-  // Bearbeiten/Zurückspulen arbeiten damit, sodass der Befehl wirklich neu ausgeführt wird.
+  // `cmdText`: the original input including the slash command (for /web the bubble shows only the question) –
+  // Edit/rewind work with it, so the command really gets re-run.
   function addBubble(role, text, cmdText) {
     hideWelcome();
     const row = el("div", "jarvis-msg " + role);
     const b = el("div", "b");
     b.textContent = text || "";
     if (role === "user") {
-      row.classList.add("group/msg"); // aktiviert die Hover-Toolbar (wie bei Antworten)
+      row.classList.add("group/msg"); // enables the hover toolbar (like on answers)
       row.appendChild(userCol(row, b, text || "", cmdText || text || ""));
     } else {
       row.appendChild(b);
@@ -483,10 +483,10 @@
     scrollToEnd();
     return b;
   }
-  // Spalte für die User-Bubble: Bubble + Hover-Aktionen darunter
-  // (Kopieren, Bearbeiten, Chat bis hierher zurückspulen und neu senden).
+  // Column for the user bubble: bubble + hover actions below
+  // (copy, edit, rewind the chat to here and resend).
   function userCol(row, b, copyText, restartText) {
-    const histIdx = messages.length; // Verlaufsstand VOR diesem Prompt (Push passiert nach addBubble)
+    const histIdx = messages.length; // history state BEFORE this prompt (push happens after addBubble)
     const col = el("div", "jarvis-user-col");
     col.appendChild(b);
     const tools = el("div",
@@ -494,10 +494,10 @@
     tools.setAttribute("role", "toolbar");
     tools.setAttribute("aria-label", tr("aria.prompt_actions"));
     tools.append(
-      turnToolBtn(TB_COPY, "Prompt kopieren", function () {
+      turnToolBtn(TB_COPY, "Copy prompt", function () {
         try { if (navigator.clipboard) navigator.clipboard.writeText(copyText); } catch (e) {}
       }),
-      turnToolBtn(TB_EDIT, "Prompt bearbeiten", function () {
+      turnToolBtn(TB_EDIT, "Edit prompt", function () {
         setInputText(restartText);
         focusInputEnd();
       }),
@@ -508,10 +508,10 @@
     col.appendChild(tools);
     return col;
   }
-  // Chat bis zu diesem Prompt zurückspulen: alles DAVOR bleibt, dieser Prompt und alles danach
-  // werden entfernt (Verlauf + Transkript), dann wird der Prompt frisch gesendet.
+  // Rewind the chat to this prompt: everything BEFORE stays, this prompt and everything after
+  // are removed (history + transcript), then the prompt is sent fresh.
   function restartChatFrom(row, histIdx, text) {
-    if (busy || !text) return; // laufende Antwort nicht unter sich wegziehen
+    if (busy || !text) return; // do not pull the rug out from under a running answer
     try { stopSpeak(); } catch (e) {}
     messages.length = Math.min(messages.length, histIdx);
     let n = row;
@@ -525,13 +525,13 @@
     submit();
   }
 
-  // ---------- Markdown -> HTML (kompakt; reicht für LLM-Antworten) ----------
+  // ---------- Markdown -> HTML (compact; enough for LLM answers) ----------
   function mdEsc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
-  // Inline-Markdown: Code, Bilder, Links, Autolinks, fett/kursiv/durchgestrichen. Bereits geparkte
-  // Fragmente (Platzhalter-Index) werden am Ende wiederhergestellt, damit z. B. eine URL im href
-  // nicht ein zweites Mal autoverlinkt wird.
+  // Inline markdown: code, images, links, autolinks, bold/italic/strikethrough. Already-parked
+  // fragments (placeholder index) are restored at the end so that, e.g., a URL in an href
+  // is not autolinked a second time.
   function mdInline(s) {
     const stash = [];
     const keep = function (h) { stash.push(h); return "" + (stash.length - 1) + ""; };
@@ -550,7 +550,7 @@
     s = s.replace(/(\d+)/g, function (_, n) { return stash[+n]; });
     return s;
   }
-  // Ein Listen-Item (ggf. Task-List "[ ]"/"[x]") als <li> rendern.
+  // Render a list item (possibly a task list "[ ]"/"[x]") as <li>.
   function mdListItem(text) {
     const tl = text.match(/^\[([ xX])\]\s+([\s\S]*)$/);
     if (tl) return '<li class="jv-md-task"><input type="checkbox" disabled' + (/[xX]/.test(tl[1]) ? " checked" : "") + "> " + mdInline(tl[2]) + "</li>";
@@ -560,7 +560,7 @@
     const lines = mdEsc(md).split(/\r?\n/);
     let html = "", i = 0;
     const isTableSep = function (l) { return /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l); };
-    // Hinweis: mdEsc() lief bereits -> "> Zitat" liegt als "&gt; Zitat" vor.
+    // Note: mdEsc() already ran -> "> quote" is present as "&gt; quote".
     const isBlock = function (l) {
       return /^```/.test(l) || /^#{1,6}\s/.test(l) || /^\s*[-*+]\s+/.test(l) || /^\s*\d+\.\s+/.test(l) || /^&gt;\s?/.test(l) || /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l);
     };
@@ -575,7 +575,7 @@
         continue;
       }
       if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { html += "<hr>"; i++; continue; }
-      // Tabelle: Kopfzeile, dann Trenner "|---|---|"
+      // Table: header row, then separator "|---|---|"
       if (/\|/.test(line) && i + 1 < lines.length && isTableSep(lines[i + 1])) {
         const headCells = splitRow(line);
         i += 2;
@@ -595,7 +595,7 @@
       const h = line.match(/^(#{1,6})\s+(.*)$/);
       if (h) { const lvl = h[1].length; html += "<h" + lvl + ">" + mdInline(h[2]) + "</h" + lvl + ">"; i++; continue; }
       if (/^&gt;\s?/.test(line)) {
-        // Zeilen sind bereits escaped -> mit mdInline rendern (KEIN mdToHtml, das würde doppelt escapen).
+        // Lines are already escaped -> render with mdInline (NOT mdToHtml, which would double-escape).
         const q = [];
         while (i < lines.length && /^&gt;\s?/.test(lines[i])) { q.push(lines[i].replace(/^&gt;\s?/, "")); i++; }
         html += "<blockquote>" + mdInline(q.join(" ")) + "</blockquote>";
@@ -621,9 +621,9 @@
     return html;
   }
 
-  // ================= Code-Artefakte: Karte in der Antwort + seitliches Code-Panel =================
-  // Große Code-Blöcke der Antwort werden zu einer kompakten Karte; Klick öffnet ein Panel mit
-  // Code/Preview-Umschalter, Zeilennummern, Syntax-Highlighting und Refresh/Copy/Export.
+  // ================= Code artifacts: card in the answer + side code panel =================
+  // Large code blocks in the answer become a compact card; clicking opens a panel with a
+  // Code/Preview toggle, line numbers, syntax highlighting, and refresh/copy/export.
   let ART_ID = 0;
   const ART_STORE = {};   // id -> { id, title, lang, code }
 
@@ -635,7 +635,7 @@
   function artExt(lang) { return ({ js: "js", jsx: "jsx", ts: "ts", tsx: "tsx", json: "json", html: "html", xml: "xml", css: "css", py: "py", sh: "sh", yaml: "yaml", md: "md", text: "txt" })[lang] || "txt"; }
   function artPretty(lang) { return ({ js: "JavaScript", jsx: "React", ts: "TypeScript", tsx: "React TSX", json: "JSON", html: "HTML", xml: "XML", css: "CSS", py: "Python", sh: "Shell", yaml: "YAML", md: "Markdown", text: "Text" })[lang] || lang.toUpperCase(); }
 
-  // ---- Syntax-Highlighting (vanilla, offline; liefert escaptes HTML mit <span class="tk-…">) ----
+  // ---- Syntax highlighting (vanilla, offline; returns escaped HTML with <span class="tk-…">) ----
   function hlEsc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function hlSpan(cls, text) { return '<span class="tk-' + cls + '">' + hlEsc(text) + "</span>"; }
   const JS_KW = { const: 1, let: 1, var: 1, function: 1, return: 1, if: 1, else: 1, for: 1, while: 1, do: 1, switch: 1, case: 1, break: 1, continue: 1, new: 1, class: 1, extends: 1, super: 1, this: 1, import: 1, from: 1, export: 1, default: 1, async: 1, await: 1, yield: 1, try: 1, catch: 1, finally: 1, throw: 1, typeof: 1, instanceof: 1, in: 1, of: 1, delete: 1, void: 1, null: 1, undefined: 1, true: 1, false: 1, NaN: 1, Infinity: 1, static: 1, get: 1, set: 1, public: 1, private: 1, protected: 1, readonly: 1, interface: 1, type: 1, enum: 1, implements: 1, as: 1, keyof: 1, namespace: 1, declare: 1 };
@@ -701,7 +701,7 @@
     return hlEsc(code);
   }
 
-  // ---- Aus einer Antwort die Artefakte extrahieren; große Code-Blöcke -> Karten, kleine bleiben inline ----
+  // ---- Extract the artifacts from an answer; large code blocks -> cards, small ones stay inline ----
   function artTitleFrom(before, code, lang) {
     const h = String(before || "").match(/(?:^|\n)#{1,6}\s+([^\n]+?)\s*$/);
     if (h) return h[1].replace(/[*_`#]+/g, "").trim();
@@ -712,7 +712,7 @@
     return artPretty(lang);
   }
   function artQualifies(code) { return code.replace(/\s+$/, "").split("\n").length >= 5 || code.length >= 180; }
-  // Artefakt-Glyph – geteilt von Karte und Panel-Kopfzeile.
+  // Artifact glyph – shared by the card and the panel header.
   const ART_GLYPH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6.25781 1.94746C8.37347 0.729082 11.0535 1.53497 12.5107 3.57051C12.9081 4.12616 12.6733 4.83755 12.1543 5.13692L10.585 6.04121H13.6201C14.2116 6.04121 14.6911 6.52105 14.6914 7.1125V12.9758C14.6912 13.5673 14.2117 14.0471 13.6201 14.0471H9.44629C8.85475 14.047 8.3752 13.5673 8.375 12.9758V7.31367L6.3877 8.45821C6.96126 9.05227 7.31436 9.86033 7.31445 10.7512C7.31439 12.5754 5.83494 14.0549 4.01074 14.0549C2.18685 14.0545 0.708072 12.5751 0.708008 10.7512C0.708192 8.92732 2.18692 7.4488 4.01074 7.44844C4.09475 7.44844 4.17831 7.45204 4.26074 7.45821C3.64258 5.34694 4.35849 3.04139 6.25781 1.94746ZM4.01074 8.69844C2.87728 8.6988 1.95819 9.61767 1.95801 10.7512C1.95807 11.8848 2.87721 12.8045 4.01074 12.8049C5.14458 12.8049 6.06439 11.885 6.06445 10.7512C6.06427 9.61745 5.14451 8.69844 4.01074 8.69844ZM9.625 12.7971H13.4414V7.29121H9.625V12.7971ZM11.377 4.1418C10.2115 2.6588 8.29686 2.21574 6.88184 3.03047C5.46682 3.84544 4.88807 5.72438 5.58594 7.47676L11.377 4.1418Z" fill="currentColor"></path></svg>';
   function artCardInner(title, writing) {
     return '<span class="jv-artifact-glyph" aria-hidden="true">' + ART_GLYPH + "</span>"
@@ -723,7 +723,7 @@
   function artCardHtml(id, title, writing) {
     return '<div class="jv-artifact-card' + (writing ? " is-writing" : "") + '" role="button" tabindex="0" data-aid="' + id + '" aria-label="' + hlEsc(tr("art.open")) + '">' + artCardInner(title, writing) + "</div>";
   }
-  // Karte als DOM-Element (für nachträgliches Anhängen bei Tool-erzeugtem Code) – teilt die Öffnen-Logik.
+  // Card as a DOM element (for appending later with tool-generated code) – shares the open logic.
   function makeArtifactCard(id, title) {
     const card = el("div", "jv-artifact-card");
     card.setAttribute("role", "button"); card.setAttribute("tabindex", "0");
@@ -736,13 +736,13 @@
   }
   function openArtifactById(id, card) { const a = ART_STORE[id]; if (a) openArtifact(a, card); }
 
-  // Ein Artefakt kann mehrere Dateien haben (Website: index.html + style.css + script.js).
+  // An artifact can have multiple files (website: index.html + style.css + script.js).
   function artFileLang(name) { return artNormLang(String(name || "").split(".").pop()); }
   function artAutoPreview(code, lang) {
     if (lang === "html" || lang === "xml" || /<!doctype html|<html[\s>]|<body[\s>]|<svg[\s>]/i.test(code)) return makeWebsitePreview(code);
     return null;
   }
-  // HTML/CSS/JS zu EINEM eigenständigen Vorschau-Dokument zusammenführen (verlinkte .css/.js werden inline).
+  // Merge HTML/CSS/JS into ONE standalone preview document (linked .css/.js are inlined).
   function makeWebsitePreview(html, css, js) {
     let doc = String(html || "");
     if (css) {
@@ -764,7 +764,7 @@
     ART_STORE[id] = { id: id, title: obj.title || artPretty(files[0].lang), files: files, previewDoc: (obj.previewDoc != null ? obj.previewDoc : artAutoPreview(files[0].code, files[0].lang)) };
     return id;
   }
-  // Karte unter die aktuelle Antwort hängen (für Tool-erzeugten Code: Website/Datei).
+  // Append the card below the current answer (for tool-generated code: website/file).
   function appendArtifactCard(id) {
     const a = ART_STORE[id]; if (!a) return;
     const host = activeTurn && activeTurn.body; if (!host) return;
@@ -772,9 +772,9 @@
     scrollToEnd();
   }
 
-  // Während des Streamens angelegte Artefakte, je Code-Block-Ordinal des aktuellen Turns.
-  // renderAnswerHtml verwendet sie beim Finalisieren wieder -> keine doppelten Artefakte,
-  // Karte und Panel zeigen dasselbe Objekt. Reset: Start von chatStreamOnce / Ende von ask().
+  // Artifacts created during streaming, keyed by the code-block ordinal of the current turn.
+  // renderAnswerHtml reuses them when finalizing -> no duplicate artifacts,
+  // card and panel show the same object. Reset: start of chatStreamOnce / end of ask().
   let streamArts = [];
   function renderAnswerHtml(acc) {
     const src = String(acc || ""); let out = "", last = 0; const arts = [];
@@ -789,7 +789,7 @@
         const title = artTitleFrom(before, code, lang);
         const ent = streamArts[ord];
         let id;
-        if (ent) { // live gestreamtes Artefakt mit dem finalen Stand aktualisieren
+        if (ent) { // update the live-streamed artifact with the final state
           id = ent.id;
           const a = ART_STORE[id];
           a.title = title;
@@ -808,7 +808,7 @@
     out += mdToHtml(src.slice(last));
     return { html: out, artifacts: arts };
   }
-  // Ersetzt md.innerHTML = mdToHtml(acc): rendert die Antwort UND verdrahtet die Artefakt-Karten.
+  // Replaces md.innerHTML = mdToHtml(acc): renders the answer AND wires up the artifact cards.
   function renderAnswer(mdEl, acc) {
     mdEl.innerHTML = renderAnswerHtml(acc).html;
     wireArtifactCards(mdEl);
@@ -822,11 +822,11 @@
     });
   }
 
-  // ---- Live-Rendering während des Streamens: Text in die Blase, Code ins Panel ----------
-  // Die Blase zeigt NUR Text; qualifizierende Code-Blöcke (artQualifies, auch auf den
-  // Teilstand angewandt) erscheinen als "Wird geschrieben …"-Karte, ihr Inhalt streamt
-  // zeichenweise ins rechte Panel (öffnet sich beim ersten Block automatisch). Noch kleine,
-  // offene Blöcke bleiben unsichtbar, bis sie qualifizieren oder klein schließen (dann inline).
+  // ---- Live rendering during streaming: text into the bubble, code into the panel ----------
+  // The bubble shows ONLY text; qualifying code blocks (artQualifies, also applied to the
+  // partial state) appear as a "Writing …" card, their content streams
+  // character by character into the right panel (which opens automatically on the first block). Still-small,
+  // open blocks stay invisible until they qualify or close small (then inline).
   function renderStreaming(out, acc) {
     const src = String(acc || "");
     const re = /```([^\n]*)\n([\s\S]*?)(```|$)/g;
@@ -861,7 +861,7 @@
     wireArtifactCards(out);
   }
 
-  // ---- Panel (Singleton, lazy) ----
+  // ---- Panel (singleton, lazy) ----
   let artPanel = null;
   function openArtifact(a, card) {
     if (!artPanel) artPanel = buildArtifactPanel();
@@ -874,8 +874,8 @@
     root.setAttribute("data-open", "false");
     root.setAttribute("aria-hidden", "true");
     root.setAttribute("role", "complementary");
-    // Kopfzeile
-    // Kopfzeile: Glyph + Titel + Byline links; Code/Preview + Refresh + Close rechts.
+    // Header
+    // Header: glyph + title + byline on the left; Code/Preview + Refresh + Close on the right.
     const head = el("div", "jv-art-head");
     const idwrap = el("div", "jv-art-id");
     const glyph = el("span", "jv-art-glyph"); glyph.setAttribute("aria-hidden", "true"); glyph.innerHTML = ART_GLYPH;
@@ -891,9 +891,9 @@
     const closeBtn = el("button", "jv-art-ico"); closeBtn.type = "button"; closeBtn.setAttribute("aria-label", tr("art.collapse")); closeBtn.title = tr("art.collapse"); closeBtn.innerHTML = HI("x", { size: 15 });
     const headRight = el("div", "jv-art-headright"); headRight.append(tabs, refreshBtn, closeBtn);
     head.append(idwrap, headRight);
-    // Datei-Leiste (nur bei mehreren Dateien sichtbar, z. B. Website: index.html · style.css · script.js)
+    // File bar (visible only with multiple files, e.g. website: index.html · style.css · script.js)
     const fileBar = el("div", "jv-art-files"); fileBar.setAttribute("hidden", "");
-    // Körper
+    // Body
     const scroll = el("div", "jv-art-scroll");
     const codeView = el("div", "jv-art-view jv-art-code");
     const gutter = el("div", "jv-art-gutter"); gutter.setAttribute("aria-hidden", "true");
@@ -961,13 +961,13 @@
     function open(a) {
       current = a; activeFile = 0; previewDirty = true;
       name.textContent = a.title;
-      void root.offsetWidth; // Reflow erzwingen -> der Einfahr-Slide animiert auch beim ersten (lazy) Öffnen
+      void root.offsetWidth; // force reflow -> the slide-in also animates on the first (lazy) open
       root.setAttribute("data-open", "true"); root.setAttribute("aria-hidden", "false");
       document.documentElement.classList.add("jv-artifact-open");
       renderFiles();
       renderCode();
       setTab("code");
-      // Nach dem Sichtbarwerden die Pille exakt positionieren (offsetWidth ist erst dann korrekt).
+      // After it becomes visible, position the pill exactly (offsetWidth is only correct then).
       requestAnimationFrame(positionInd);
     }
     function close() {
@@ -985,8 +985,8 @@
     });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && root.getAttribute("data-open") === "true") close(); });
     window.addEventListener("resize", function () { if (root.getAttribute("data-open") === "true") positionInd(); });
-    // Live-Streaming: Code des gerade offenen Artefakts neu zeichnen und mitscrollen —
-    // aber nur, wenn der Nutzer ohnehin am Ende "klebt" (sonst nicht aus dem Lesen reißen).
+    // Live streaming: redraw the code of the currently open artifact and scroll along —
+    // but only if the user is "stuck" at the bottom anyway (otherwise don't yank them out of reading).
     function streamTo(a) {
       if (current !== a) return;
       const nearBottom = scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 48;
@@ -997,17 +997,17 @@
     return { root: root, open: open, close: close, streamTo: streamTo };
   }
 
-  // ---------- KI-Antwort als Transkript-Eintrag (KEINE Card; wie das Original) ----------
+  // ---------- AI answer as a transcript entry (NO card; like the original) ----------
   const TB_COPY = HI("copy", { style: "width:var(--class-small-icon);height:var(--class-small-icon)" });
   const TB_PIN = HI("pin", { style: "width:var(--class-small-icon);height:var(--class-small-icon)" });
   const TB_EDIT = HI("edit", { style: "width:var(--class-small-icon);height:var(--class-small-icon)" });
   const TB_RESTART = HI("restart", { style: "width:var(--class-small-icon);height:var(--class-small-icon)" });
   const TB_SPEAK = HI("play", { style: "width:var(--class-small-icon);height:var(--class-small-icon)" });
-  // Pause-Icon (zwei Balken) – Vorlesen-Button wechselt darauf, während gesprochen wird.
+  // Pause icon (two bars) – the read-aloud button switches to it while speaking.
   const TB_PAUSE = HI("pause", { style: "width:var(--class-small-icon);height:var(--class-small-icon)" });
-  // Hintergrund-Span der Icon-Buttons (Hover/Active), geteilt von turnToolBtn + Icon-Wechsel.
+  // Background span of the icon buttons (hover/active), shared by turnToolBtn + icon swap.
   const TB_SQUISH = '<span aria-hidden="true" class="btn-squish"></span>';
-  // Relative Zeit ("jetzt" / "vor X Minuten"), aktualisiert sich; Tooltip = absolutes Datum.
+  // Relative time ("now" / "X minutes ago"), updates itself; tooltip = absolute date.
   const relTimes = [];
   let relTimer = 0;
   function fmtRel(date) {
@@ -1046,19 +1046,19 @@
     if (onClick) b.addEventListener("click", onClick);
     return b;
   }
-  // Vorlesen-Button zwischen Play (▷) und Pause (⏸) umschalten.
+  // Toggle the read-aloud button between play (▷) and pause (⏸).
   function setSpeakBtnState(btn, playing) {
     if (!btn) return;
     btn.innerHTML = TB_SQUISH + (playing ? TB_PAUSE : TB_SPEAK);
-    btn.classList.toggle("jarvis-speaking", playing); // behält den Hover-Look bis fertig
+    btn.classList.toggle("jarvis-speaking", playing); // keeps the hover look until done
     btn.setAttribute("aria-label", playing ? tr("read.stop") : tr("read.aloud"));
     btn.setAttribute("aria-pressed", playing ? "true" : "false");
   }
-  // Den gerade aktiven Vorlesen-Button (falls vorhanden) auf Play zurücksetzen.
+  // Reset the currently active read-aloud button (if any) back to play.
   function resetSpeakBtn() {
     if (activeSpeakBtn) { setSpeakBtnState(activeSpeakBtn, false); activeSpeakBtn = null; }
   }
-  // Assistenten-Eintrag. Fußzeile: während des Denkens "✳ Ns" (live), danach Toolbar (hover) + relative Zeit.
+  // Assistant entry. Footer: while thinking "✳ Ns" (live), afterwards toolbar (hover) + relative time.
   function addAssistantTurn() {
     hideWelcome();
     const article = el("div", "jarvis-turn pb-[var(--chat-turn-gap)]");
@@ -1079,22 +1079,22 @@
     tools.setAttribute("aria-label", tr("aria.msg_actions"));
     const speakBtn = turnToolBtn(TB_SPEAK, tr("read.aloud"), function (e) {
       const b = e.currentTarget;
-      if (activeSpeakBtn === b) { stopSpeak(); return; } // läuft gerade → stoppen
+      if (activeSpeakBtn === b) { stopSpeak(); return; } // currently running → stop
       const t = body.textContent || "";
       if (t) speak(t, b);
     });
     tools.append(
-      turnToolBtn(TB_COPY, "Nachricht kopieren", function () {
+      turnToolBtn(TB_COPY, "Copy message", function () {
         try { if (navigator.clipboard) navigator.clipboard.writeText(body.textContent || ""); } catch (e) {}
       }),
-      turnToolBtn(TB_PIN, "Als Kapitel anheften", function (e) {
+      turnToolBtn(TB_PIN, "Pin as chapter", function (e) {
         const b = e.currentTarget;
         b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true");
       }),
       speakBtn
     );
     const time = el("time", "jarvis-rel text-footnote text-t6 tabular-nums self-center pl-p1");
-    tools.appendChild(time); // Zeit Teil der Hover-Toolbar (wie im Original)
+    tools.appendChild(time); // time is part of the hover toolbar (like the original)
     foot.append(thinking, tools);
     msg.append(h2, contentWrap, foot);
     article.appendChild(msg);
@@ -1118,7 +1118,7 @@
     }
     return { article: article, body: body, h2: h2, speakBtn: speakBtn, startThinking: startThinking, finish: finish };
   }
-  // Einfacher Assistenten-Text-Eintrag (kein Streaming) – für Hinweise.
+  // Simple assistant text entry (no streaming) – for notices.
   function addAssistantText(text) {
     const turn = addAssistantTurn();
     const md = el("div", "epitaxy-markdown");
@@ -1129,17 +1129,17 @@
     return turn;
   }
   function scrollToEnd() { scrollC.scrollTop = scrollC.scrollHeight; }
-  // Status-Pille entfernt: Zustand zeigt der Identitäts-Chip (setAssistant); Fehler stehen im Transkript.
-  // Funktion bleibt als No-op erhalten (zahlreiche Aufrufer); Fehlertexte landen zur Diagnose im Log.
+  // Status pill removed: the identity chip shows the state (setAssistant); errors appear in the transcript.
+  // The function stays as a no-op (many callers); error texts go to the log for diagnostics.
   function setStatus(state, text) {
     if (state === "error" && text) { try { console.warn("[Oddvark]", text); } catch (e) {} }
   }
-  // Menü (position:fixed im body) bündig über dem Anker platzieren – ZOOM-SICHER.
-  // Falle unter html{zoom:1.25}: getBoundingClientRect()/innerWidth liefern VISUELLE px
-  // (=Layout×zoom), style.left/top werden beim Rendern aber erneut ×zoom skaliert. Daher
-  // NUR left/top verwenden (rein Anker-rect-basiert, ÷zoom) statt bottom/right mit Viewport-
-  // Mathe (die ist unter Zoom unzuverlässig → verschobene Dropdowns). Menügröße via
-  // offsetWidth/Height (Layout-px, unabhängig von zoom UND dem Einblend-transform).
+  // Place a menu (position:fixed in the body) flush above the anchor – ZOOM-SAFE.
+  // Trap under html{zoom:1.25}: getBoundingClientRect()/innerWidth return VISUAL px
+  // (=layout×zoom), but style.left/top get scaled by ×zoom again on render. So
+  // use ONLY left/top (purely anchor-rect based, ÷zoom) instead of bottom/right with viewport
+  // math (which is unreliable under zoom → shifted dropdowns). Menu size via
+  // offsetWidth/Height (layout px, independent of zoom AND the fade-in transform).
   function placeFixedMenu(menu, anchor, align) {
     if (!anchor) return;
     const z = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
@@ -1147,8 +1147,8 @@
     const w = menu.offsetWidth, h = menu.offsetHeight;
     menu.style.right = menu.style.bottom = "";
     let left = (align === "right") ? (r.right / z - w) : (r.left / z);
-    let top = (r.top / z) - h - 6; // 6px Layout-Abstand oberhalb des Triggers
-    left = Math.max(8, Math.min(left, window.innerWidth / z - w - 8)); // im Viewport halten
+    let top = (r.top / z) - h - 6; // 6px layout gap above the trigger
+    left = Math.max(8, Math.min(left, window.innerWidth / z - w - 8)); // keep within the viewport
     top = Math.max(8, top);
     menu.style.left = left + "px";
     menu.style.top = top + "px";
@@ -1159,7 +1159,7 @@
   function getInputText() {
     let t;
     if (input.querySelector("[data-cmd]")) {
-      // Befehls-Chips (Plus-Menü) tragen den Slash-Befehl in data-cmd – Beschriftung zählt nicht.
+      // Command chips (plus menu) carry the slash command in data-cmd – the label doesn't count.
       const c = input.cloneNode(true);
       c.querySelectorAll("[data-cmd]").forEach(function (n) {
         n.replaceWith(document.createTextNode(n.getAttribute("data-cmd") + " "));
@@ -1180,14 +1180,14 @@
     input.innerHTML = "<p>" + escapeHtml(t) + "</p>";
     updateSendBtn();
   }
-  // Slash-Befehl als farbige Chip-Karte ins Eingabefeld legen (Plus-Menü: Bild/Websuche).
-  // contenteditable=false -> Backspace löscht die Karte als Ganzes. Beschriftung ohne "/";
-  // getInputText() übersetzt die Karte über data-cmd zurück in den Slash-Befehl.
+  // Put the slash command into the input field as a colored chip card (plus menu: image/web search).
+  // contenteditable=false -> Backspace deletes the card as a whole. Label without "/";
+  // getInputText() translates the card back into the slash command via data-cmd.
   const CMD_CHIPS = {
     "/bild": { ico: "image", cls: "is-bild", key: "cmd.image" },
     "/web": { ico: "globe", cls: "is-web", key: "cmd.web" },
   };
-  // Vorhandenen Befehls-Chip (+ folgendes Leerzeichen) entfernen. Gibt data-cmd zurueck (oder "").
+  // Remove an existing command chip (+ the following space). Returns data-cmd (or "").
   function removeCmdChip() {
     const chip = input.querySelector(".jarvis-cmd-chip[data-cmd]");
     if (!chip) return "";
@@ -1199,10 +1199,10 @@
   }
   function prefillCommand(cmd) {
     const c = CMD_CHIPS[cmd] || { ico: "terminal", cls: "", key: "" };
-    // Toggle: gleicher Befehl schon aktiv -> entfernen (Text bleibt erhalten). Anderer -> tauschen.
+    // Toggle: same command already active -> remove (text stays). Different -> swap.
     const prev = removeCmdChip();
     if (prev === cmd) { syncInputEmpty(); focusInputEnd(); return; }
-    // Bestehenden Text NICHT loeschen: in den vorhandenen Paragraphen einsetzen.
+    // Do NOT delete existing text: insert it into the existing paragraph.
     let p = input.querySelector("p");
     if (!p) { input.innerHTML = "<p></p>"; p = input.querySelector("p"); }
     p.classList.remove("is-empty", "is-editor-empty");
@@ -1214,15 +1214,15 @@
     const rmLbl = tr("cmd.remove").replace(/"/g, "&quot;");
     chip.innerHTML = HI(c.ico, { size: 13 }) + "<span>" + (c.key ? tr(c.key) : cmd.slice(1)) + "</span>" +
       '<span class="jarvis-cmd-x" role="button" tabindex="-1" aria-label="' + rmLbl + '" title="' + rmLbl + '">' + HI("x", { size: 11 }) + "</span>";
-    // Chip an den ANFANG des Paragraphen, gefolgt von einem Leerzeichen; bestehender Text folgt.
+    // Chip at the START of the paragraph, followed by a space; existing text follows.
     p.insertBefore(document.createTextNode(" "), p.firstChild);
     p.insertBefore(chip, p.firstChild);
     updateSendBtn();
     focusInputEnd();
   }
-  // Hover-X am Befehls-Chip: entfernt den /bild- bzw. /web-Chip wieder (dann wird KEINE
-  // Websuche/Bilderzeugung angewandt). mousedown + preventDefault, damit Fokus/Selektion
-  // im contenteditable nicht gestört werden.
+  // Hover-X on the command chip: removes the /bild or /web chip again (then NO
+  // web search/image generation is applied). mousedown + preventDefault so focus/selection
+  // in the contenteditable aren't disturbed.
   input.addEventListener("mousedown", function (e) {
     const x = e.target.closest && e.target.closest(".jarvis-cmd-x");
     if (!x) return;
@@ -1231,12 +1231,12 @@
     const chip = x.closest(".jarvis-cmd-chip");
     if (!chip) return;
     const next = chip.nextSibling;
-    if (next && next.nodeType === 3 && /^[\s ]*$/.test(next.textContent || "")) next.remove(); // Space nach dem Chip
+    if (next && next.nodeType === 3 && /^[\s ]*$/.test(next.textContent || "")) next.remove(); // space after the chip
     chip.remove();
     syncInputEmpty();
     focusInputEnd();
   });
-  // Eingabefeld fokussieren, Cursor ans Ende setzen.
+  // Focus the input field, put the cursor at the end.
   function focusInputEnd() {
     input.focus();
     const sel = window.getSelection();
@@ -1248,24 +1248,24 @@
       sel.addRange(rng);
     }
   }
-  // Senden-Pfeil: hell + klickbar NUR wenn Text im Feld steht (Grundgerüst startet ihn `disabled`).
-  // disabled entfernen → Tailwind schaltet von text-uncontained-disabled (dunkel) auf -default (hell);
-  // der Klick-Handler (submit) feuert dann auch wieder.
+  // Send arrow: bright + clickable ONLY when there is text in the field (the scaffold starts it `disabled`).
+  // Removing disabled → Tailwind switches from text-uncontained-disabled (dark) to -default (bright);
+  // the click handler (submit) then fires again too.
   function updateSendBtn() {
     if (!sendBtn) return;
     const has = !!getInputText();
     sendBtn.disabled = !has;
     sendBtn.style.cursor = has ? "pointer" : "";
   }
-  // Grundgerüst ohne React/ProseMirror-Runtime: nichts entfernt beim Tippen die
-  // `is-editor-empty`-Klasse → der Platzhalter (CSS `p.is-editor-empty:first-child::before`)
-  // bliebe stehen. Daher selbst toggeln, abhängig vom Inhalt.
+  // Scaffold without a React/ProseMirror runtime: nothing removes the
+  // `is-editor-empty` class while typing → the placeholder (CSS `p.is-editor-empty:first-child::before`)
+  // would remain. So toggle it ourselves, depending on the content.
   function syncInputEmpty() {
     const empty = !getInputText();
     updateSendBtn();
     let p = input.querySelector("p");
     if (empty) {
-      if (!p) { clearInput(); return; } // Struktur kollabiert (alles gelöscht) → wiederherstellen
+      if (!p) { clearInput(); return; } // structure collapsed (everything deleted) → restore
       p.classList.add("is-empty", "is-editor-empty");
       p.setAttribute("data-placeholder", inputPlaceholder());
     } else {
@@ -1277,12 +1277,12 @@
   function updateModelLabel() {
     if (modelLabelSpan) modelLabelSpan.textContent = model || "Ollama";
   }
-  // Aufwand-Wert auf gültigen Bereich 0..5 begrenzen, ungültig -> Default 3 ("Extra").
+  // Clamp the effort value to the valid range 0..5, invalid -> default 3 ("Extra").
   function clampEffort(v) {
     if (!Number.isFinite(v)) return 3;
     return Math.max(0, Math.min(5, Math.round(v)));
   }
-  // Kurze "Pop"-Animation (Fade + Blur + leichtes Anheben) für die Stufen-Wörter.
+  // Short "pop" animation (fade + blur + slight lift) for the level words.
   function popAnim(elm) {
     if (!elm) return;
     try {
@@ -1296,7 +1296,7 @@
       );
     } catch (e) {}
   }
-  // Text des unteren "Extra"-Buttons auf das aktuelle Level setzen (lila bei Ultracode).
+  // Set the text of the bottom "Extra" button to the current level (purple for Ultracode).
   function updateEffortLabel(animate) {
     if (!effortLabelSpan) return;
     const t = tr("effort." + effort);
@@ -1305,7 +1305,7 @@
     effortLabelSpan.style.color = effort === 5 ? "var(--extended-purple)" : "";
     if (animate && changed) popAnim(effortLabelSpan);
   }
-  // Text des "Auto"-Buttons auf den Kurztext des aktiven Modus setzen (+ Farbe via MODE_COLORS).
+  // Set the text of the "Auto" button to the short text of the active mode (+ color via MODE_COLORS).
   function updateModeLabel(animate) {
     if (!modeLabelSpan) return;
     const m = MODES.find(function (x) { return x.value === mode; }) || MODES.find(function (x) { return x.value === "auto"; });
@@ -1313,11 +1313,11 @@
     const changed = modeLabelSpan.textContent !== shortLabel;
     modeLabelSpan.textContent = shortLabel;
     modeLabelSpan.style.color = MODE_COLORS[m.value] || "";
-    if (modeBtn) modeBtn.style.backgroundColor = MODE_BG[m.value] || ""; // Hintergrund-Fläche mitfärben
+    if (modeBtn) modeBtn.style.backgroundColor = MODE_BG[m.value] || ""; // tint the background area too
     if (animate && changed) popAnim(modeLabelSpan);
   }
 
-  // ---------- Modus-Menü (App-Style-Popup am "Auto"-Button, linksbündig nach oben) ----------
+  // ---------- Mode menu (app-style popup on the "Auto" button, left-aligned upward) ----------
   function buildModeMenu(btn, onPick) {
     const CHECK = HI("check", { size: 16 });
 
@@ -1407,8 +1407,8 @@
     return { setSelected: setSelected };
   }
 
-  // ---------- Plus-Menü (App-Style-Popup am "+"-Button, gleicher Stil wie das Modus-Menü) ----------
-  // Aktionen statt Auswahl: Bild erstellen (/bild), Websuche (/web), Fotos & Dateien anhängen (Upload).
+  // ---------- Plus menu (app-style popup on the "+" button, same style as the mode menu) ----------
+  // Actions instead of a selection: create image (/bild), web search (/web), attach photos & files (upload).
   function buildPlusMenu(btn) {
     const ACTIONS = [
       { label: tr("plus.image"), ico: "image", run: function () { prefillCommand("/bild"); } },
@@ -1488,10 +1488,10 @@
     window.addEventListener("resize", function () { if (isOpen()) place(); });
   }
 
-  // ---------- Oddvark-Identität (Fußzeile): Orb + Name + Live-Status, Klick -> Einstellungen ----------
+  // ---------- Oddvark identity (footer): orb + name + live status, click -> settings ----------
   function buildIdentityChip() {
     const ARROW = HI("chevRight", { size: 16 });
-    // Oddware-Logo als Marken-Avatar (viewBox auf den Inhalt zentriert; IDs namespaced).
+    // Oddvark logo as the brand avatar (viewBox centered on the content; IDs namespaced).
     const LOGO =
       '<svg viewBox="88 45 300 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
       "<defs>" +
@@ -1508,7 +1508,7 @@
       '<rect x="345" y="119" width="35" height="36" rx="6.5" fill="url(#jvl-main)"/>' +
       "</svg>";
 
-    // Chip aufbauen und den Account-Button ersetzen.
+    // Build the chip and replace the account button.
     const chip = el("button", "jv-id");
     chip.type = "button";
     chip.setAttribute("aria-haspopup", "dialog");
@@ -1532,7 +1532,7 @@
     if (acct) acct.replaceWith(chip);
     else return { setState: function () {}, syncSettings: function () {} };
 
-    // Einstellungs-Popover – gleicher Stil wie die anderen Dropdowns, linksbündig nach oben.
+    // Settings popover – same style as the other dropdowns, left-aligned upward.
     const menu = el("div", "jv-modelmenu jv-mm-left jv-settings");
     menu.setAttribute("role", "dialog");
     menu.setAttribute("aria-label", tr("menu.settings"));
@@ -1576,8 +1576,8 @@
 
     list.append(voiceItem, langItem, sep, modelsItem);
 
-    // Sprach-Untermenü (Flyout rechts neben der "Sprache"-Zeile; bleibt offen, während das
-    // Settings-Popover offen ist – daher NICHT über closeOpenMenu, sondern an dessen Leben gekoppelt).
+    // Language submenu (flyout to the right of the "Language" row; stays open while the
+    // settings popover is open – so NOT via closeOpenMenu, but tied to its lifetime).
     const CHECK = HI("check", { size: 16 });
     const langMenu = el("div", "jv-modelmenu jv-submenu");
     langMenu.setAttribute("role", "menu");
@@ -1589,8 +1589,8 @@
     const lmList = el("div", "jv-mm-list");
     lmScroll.appendChild(lmList);
     langMenu.append(lmSurface, lmScroll);
-    // In das Popover hängen (gleicher Zoom-Kontext) und per position:absolute relativ zur
-    // Zeile platzieren -> keine zoom-abhängige Viewport-Mathe nötig.
+    // Append into the popover (same zoom context) and place it via position:absolute relative to
+    // the row -> no zoom-dependent viewport math needed.
     menu.appendChild(langMenu);
 
     const langOptEls = LANGS.map(function (l) {
@@ -1616,8 +1616,8 @@
     }
     function langOpen() { return langMenu.getAttribute("data-open") === "true"; }
     function placeLang() {
-      // Relativ zum Popover (offsetParent): left:100% via CSS, Unterkante an der "Sprache"-Zeile
-      // ausrichten und nach oben wachsen. Alles im selben Zoom-Kontext -> keine Skalierungsmathe.
+      // Relative to the popover (offsetParent): left:100% via CSS, align the bottom edge with the "Language"
+      // row and grow upward. All in the same zoom context -> no scaling math.
       langMenu.style.left = "";
       langMenu.style.bottom = "";
       const top = langItem.offsetTop + langItem.offsetHeight - langMenu.offsetHeight;
@@ -1639,8 +1639,8 @@
     function chooseLang(code) {
       lang = code;
       localStorage.setItem(LS_LANG, lang);
-      syncVoiceToLang();   // gewählte Stimme ggf. an neue Sprache anpassen (Overlay-Dropdown filtert beim Öffnen)
-      if (window.JV_I18N) JV_I18N.setLang(lang); // UI-Sprache umschalten (en/de)
+      syncVoiceToLang();   // adjust the selected voice to the new language if needed (overlay dropdown filters on open)
+      if (window.JV_I18N) JV_I18N.setLang(lang); // switch the UI language (en/de)
       refresh();
       closeLang();
     }
@@ -1711,9 +1711,9 @@
       }
     });
     document.addEventListener("click", function (e) {
-      // Sprach-Submenu schließen, wenn ausserhalb davon UND ausserhalb der "Sprache"-Zeile geklickt wird.
+      // Close the language submenu when clicking outside it AND outside the "Language" row.
       if (langOpen() && !langMenu.contains(e.target) && !langItem.contains(e.target)) closeLang();
-      // Settings-Popover schließen, wenn ausserhalb von Popover, Chip und Submenu geklickt wird.
+      // Close the settings popover when clicking outside the popover, chip, and submenu.
       if (isOpen() && !menu.contains(e.target) && !chip.contains(e.target) && !langMenu.contains(e.target)) close();
     });
     window.addEventListener("resize", function () { if (isOpen()) place(); if (langOpen()) placeLang(); });
@@ -1722,14 +1722,14 @@
       chip.dataset.state = s;
       sstate.textContent = tr("state." + s);
     }
-    // Bei UI-Sprachwechsel: aktuellen Status + aria-Label neu beschriften.
+    // On UI language change: relabel the current status + aria-label.
     function relabel() { chip.setAttribute("aria-label", tr("aria.jarvis_status")); setState(chip.dataset.state || "connecting"); refresh(); }
 
     refresh();
     return { setState: setState, syncSettings: refresh, relabel: relabel };
   }
 
-  // ---------- Modell-Menü (App-Style-Popup am Bottom-Button) ----------
+  // ---------- Model menu (app-style popup on the bottom button) ----------
   function buildModelMenu(btn, onPick, onAdd) {
     const CHECK = HI("check", { size: 16 });
     const PLUS = HI("plus", { size: 16 });
@@ -1759,7 +1759,7 @@
       els[activeIdx].scrollIntoView({ block: "nearest" });
     }
     function setOptions(names) {
-      opts = names.slice(); // ALLE installierten Modelle zeigen (Liste ist scrollbar)
+      opts = names.slice(); // show ALL installed models (the list is scrollable)
       list.innerHTML = "";
       opts.forEach((n, i) => {
         const it = el("div", "jv-mm-item");
@@ -1773,11 +1773,11 @@
         it.addEventListener("mousemove", () => setActive(items().indexOf(it)));
         list.appendChild(it);
       });
-      // Trennstrich
+      // Separator
       const sep = el("div", "jv-mm-sep");
       sep.setAttribute("role", "separator");
       list.appendChild(sep);
-      // "Modell hinzufügen" (Label via i18n)
+      // "Add model" (label via i18n)
       const add = el("div", "jv-mm-item jv-mm-add");
       add.setAttribute("role", "menuitem");
       add.dataset.action = "add";
@@ -1813,7 +1813,7 @@
       place();
       menu.setAttribute("data-open", "true");
       if (btn) btn.setAttribute("aria-expanded", "true");
-      // Highlight auf dem gewählten Eintrag (per data-value, robust gegen den "Auto"-Zusatzeintrag)
+      // Highlight the selected entry (by data-value, robust against the extra "Auto" entry)
       const els = items();
       let sel = -1;
       els.forEach((e2, k) => { if (e2.dataset.value === selected) sel = k; });
@@ -1847,7 +1847,7 @@
     document.addEventListener("click", (e) => {
       if (isOpen() && !menu.contains(e.target) && !(btn && btn.contains(e.target))) close();
     });
-    // Verlässt die Maus das Menü, den (Maus-)Highlight wieder entfernen
+    // When the mouse leaves the menu, remove the (mouse) highlight again
     menu.addEventListener("mouseleave", () => {
       activeIdx = -1;
       items().forEach((e) => e.classList.remove("is-active"));
@@ -1857,15 +1857,15 @@
     return { setOptions: setOptions, setSelected: setSelected };
   }
 
-  // ---------- Energie-Animation: graues Raster ueberall + verstreute, blurred lila Zellen ----------
-  // Laeuft im Fill des Aufwand-Sliders, aber nur bei Ultracode. Gekapselt: start/stop/resize.
+  // ---------- Energy animation: gray grid everywhere + scattered, blurred purple cells ----------
+  // Runs in the fill of the effort slider, but only at Ultracode. Encapsulated: start/stop/resize.
   function createEnergyAnimation(cv) {
     const ctx = cv.getContext("2d");
     const config = { cellSize: 2.5, gap: 1.5 };
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     let width = 0, height = 0, raf = 0, running = false, ro = null;
 
-    // Backing-Store an die LAYOUT-Groesse anpassen (clientWidth ist transform-unabhaengig).
+    // Adjust the backing store to the LAYOUT size (clientWidth is transform-independent).
     function fit() {
       const w = cv.clientWidth, h = cv.clientHeight;
       if (w <= 0 || h <= 0) return false;
@@ -1878,7 +1878,7 @@
     function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
 
     function draw(time) {
-      // dunkler Grund
+      // dark background
       const bg = ctx.createLinearGradient(0, 0, width, 0);
       bg.addColorStop(0, "#272929"); bg.addColorStop(0.4, "#242525"); bg.addColorStop(1, "#1f1f24");
       ctx.fillStyle = bg;
@@ -1886,7 +1886,7 @@
 
       const pitch = config.cellSize + config.gap;
       const size = config.cellSize;
-      // Grau-/Lila-Zellen ueberall, je Zelle eigene Phase + mehrere Richtungen -> kein Links-Lauf; geblurrt.
+      // Gray/purple cells everywhere, each cell its own phase + several directions -> no leftward drift; blurred.
       for (let y = pitch / 2; y < height + pitch; y += pitch) {
         for (let x = pitch / 2; x < width + pitch; x += pitch) {
           const ci = Math.round(x / pitch), cj = Math.round(y / pitch);
@@ -1899,11 +1899,11 @@
             Math.sin((x - y) * 0.06 - time * 1.2) +
             Math.sin(cellPhase + time * 2.0) * 1.5;
           let p = (n / 5.5) * 0.5 + 0.5;          // 0..1
-          p = clamp((p - 0.34) / 0.5, 0, 1);       // Kontrast: viele grau, einige lila
+          p = clamp((p - 0.34) / 0.5, 0, 1);       // contrast: many gray, some purple
           const r = Math.round(88 + (150 - 88) * p);
           const g = Math.round(87 + (120 - 87) * p);
           const b = Math.round(100 + (245 - 100) * p);
-          const alpha = 0.3 + p * 0.55;            // grau sichtbar, lila heller
+          const alpha = 0.3 + p * 0.55;            // gray visible, purple brighter
           ctx.fillStyle = "rgba(" + r + ", " + g + ", " + b + ", " + alpha + ")";
           ctx.fillRect(x - size / 2, y - size / 2, size, size);
         }
@@ -1929,18 +1929,18 @@
     return { start: start, stop: stop, resize: fit };
   }
 
-  // ---------- Aufwand-Menü (App-Style-Popup am unteren "Extra"-Button) ----------
+  // ---------- Effort menu (app-style popup on the bottom "Extra" button) ----------
   function buildEffortMenu(btn, onChange) {
-    const MIN = 0, MAX = 5, TOP = 5; // TOP = Ultracode (lila Sonderzustand)
+    const MIN = 0, MAX = 5, TOP = 5; // TOP = Ultracode (purple special state)
     const INFO = HI("info", { size: 14 });
 
-    let value = 3; // wird via setValue() überschrieben
-    let lastLevel = null; // für die Wort-Animation beim Stufenwechsel
+    let value = 3; // overwritten via setValue()
+    let lastLevel = null; // for the word animation on level change
 
-    // --- Aufbau (el()-Helfer, an document.body anhängen) ---
+    // --- Build (el() helper, append to document.body) ---
     const menu = el("div", "jv-effort");
     menu.setAttribute("role", "dialog");
-    menu.setAttribute("aria-label", "Aufwand");
+    menu.setAttribute("aria-label", "Effort");
     menu.setAttribute("tabindex", "-1");
     menu.setAttribute("data-open", "false");
 
@@ -1949,7 +1949,7 @@
 
     const body = el("div", "jv-ef-body");
 
-    // Kopfzeile: Titel + Level-Label (+ dekorativer Info-Button)
+    // Header: title + level label (+ decorative info button)
     const head = el("div", "jv-ef-head");
     const title = el("h2", "jv-ef-title", tr("menu.effort"));
     const levelLabel = el("span", "jv-ef-level");
@@ -1960,14 +1960,14 @@
     info.innerHTML = INFO;
     head.append(title, levelLabel, info);
 
-    // Enden-Beschriftung: links "Schneller", rechts "Intelligenter"
+    // End labels: "Faster" on the left, "Smarter" on the right
     const ends = el("div", "jv-ef-ends");
     ends.append(el("span", "jv-ef-end", tr("effort.faster")), el("span", "jv-ef-end", tr("effort.smarter")));
 
-    // Slider: Track + Fill + 6 Punkte + Handle + verstecktes <input type=range> (a11y/Tastatur)
+    // Slider: track + fill + 6 dots + handle + hidden <input type=range> (a11y/keyboard)
     const track = el("div", "jv-ef-track");
     const fill = el("div", "jv-ef-fill");
-    // Energie-Animation im Fill – läuft nur bei Ultracode (siehe syncEnergy()).
+    // Energy animation in the fill – runs only at Ultracode (see syncEnergy()).
     const energyCanvas = el("canvas", "jv-ef-energy");
     fill.appendChild(energyCanvas);
     const energy = createEnergyAnimation(energyCanvas);
@@ -1993,16 +1993,16 @@
     menu.append(surface, body);
     document.body.appendChild(menu);
 
-    // --- Darstellung an den Wert anpassen (Fill, Handle, Punkte, Labels, Persistenz) ---
-    // Position im eingerückten Bereich (14px Rand) – deckungsgleich mit den Punkten,
-    // damit der Handle bei jeder Stufe genau auf dem Punkt sitzt (auch "Niedrig" = erster Punkt).
+    // --- Adjust the presentation to the value (fill, handle, dots, labels, persistence) ---
+    // Position within the inset area (14px margin) – congruent with the dots,
+    // so the handle sits exactly on the dot at every level (including "Low" = first dot).
     const INSET = 14;
     const HANDLE_W = 14;
     function posExpr(v) { return "calc(" + INSET + "px + (100% - " + (2 * INSET) + "px) * " + (v / MAX) + ")"; }
     function paint() {
       const ultra = value === TOP;
-      // Beim Ziehen folgen Fill/Handle dem Zeiger 1:1 (paintDrag) – Position hier nicht anfassen.
-      // Ultracode: Pille bündig an den rechten Rand (Fill voll); sonst genau auf dem Punkt (eingerückt).
+      // While dragging, fill/handle follow the pointer 1:1 (paintDrag) – don't touch the position here.
+      // Ultracode: pill flush to the right edge (fill full); otherwise exactly on the dot (inset).
       if (!dragging) {
         if (ultra) {
           fill.style.width = "100%";
@@ -2020,16 +2020,16 @@
         if (lastLevel !== null) popAnim(levelLabel);
         lastLevel = label;
       }
-      // Ultracode: lila Sonderzustand über data-top-stop am Slider-Root.
+      // Ultracode: purple special state via data-top-stop on the slider root.
       if (ultra) menu.setAttribute("data-top-stop", "");
       else menu.removeAttribute("data-top-stop");
       levelLabel.classList.toggle("is-top", ultra);
-      // Range/a11y synchron halten.
+      // Keep range/a11y in sync.
       range.value = String(value);
       range.setAttribute("aria-valuetext", label);
       syncEnergy();
     }
-    // Energie-Animation nur bei Ultracode UND offenem Popup laufen lassen (sonst CPU sparen).
+    // Run the energy animation only at Ultracode AND when the popup is open (otherwise save CPU).
     function syncEnergy() {
       if (value === TOP && isOpen()) {
         energyCanvas.style.display = "block";
@@ -2040,7 +2040,7 @@
         energyCanvas.style.display = "none";
       }
     }
-    // Wert setzen, optional Änderung melden (Persistenz + Trigger-Label via onChange).
+    // Set the value, optionally report the change (persistence + trigger label via onChange).
     function set(v, emit) {
       v = Math.max(MIN, Math.min(MAX, Math.round(v)));
       const changed = v !== value;
@@ -2048,23 +2048,23 @@
       paint();
       if (emit && changed && onChange) onChange(value);
     }
-    // Initialwert ohne onChange (verhindert Schreiben beim Aufbau).
+    // Initial value without onChange (prevents writing during setup).
     function setValue(v) { set(Number(v), false); }
 
-    // Pixel-Position -> Verhältnis 0..1 im eingerückten Bereich (kontinuierlich, fürs flüssige Ziehen).
+    // Pixel position -> ratio 0..1 within the inset area (continuous, for smooth dragging).
     function ratioFromClientX(clientX) {
       const r = track.getBoundingClientRect();
       const usable = r.width - 2 * INSET;
       if (usable <= 0) return value / MAX;
       return Math.max(0, Math.min(1, (clientX - r.left - INSET) / usable));
     }
-    // Pixel-Position -> nächste Stufe (Snapping).
+    // Pixel position -> nearest level (snapping).
     function stepFromClientX(clientX) { return Math.round(ratioFromClientX(clientX) * MAX); }
 
-    // --- Interaktion ---
-    // Ziehen: Fill/Handle folgen dem Zeiger 1:1 (Transitions via [data-dragging] aus), nur
-    // Label/Punkte/Wert rasten live auf die nächste Stufe. Beim Loslassen gleitet der Handle
-    // mit der normalen CSS-Transition sanft auf die Stufen-Position.
+    // --- Interaction ---
+    // Dragging: fill/handle follow the pointer 1:1 (transitions off via [data-dragging]), only
+    // label/dots/value snap live to the nearest level. On release the handle glides
+    // smoothly to the level position with the normal CSS transition.
     let dragging = false, pendingDrag = false;
     function paintDrag(ratio) {
       const p = "calc(" + INSET + "px + (100% - " + (2 * INSET) + "px) * " + ratio + ")";
@@ -2072,7 +2072,7 @@
       handle.style.left = p;
     }
     function moveDrag(e) {
-      if (pendingDrag && !dragging) { dragging = true; menu.setAttribute("data-dragging", ""); } // Track-Klick wird erst bei Bewegung zum Ziehen
+      if (pendingDrag && !dragging) { dragging = true; menu.setAttribute("data-dragging", ""); } // a track click only becomes a drag on movement
       if (!dragging) return;
       const ratio = ratioFromClientX(e.clientX);
       paintDrag(ratio);
@@ -2084,11 +2084,11 @@
       dragging = false;
       menu.removeAttribute("data-dragging");
       try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (err) {}
-      paint(); // sanft auf die Stufen-Position gleiten
+      paint(); // glide smoothly to the level position
     }
-    // Klick auf Track (oder Punkt) -> Stufe setzen (gleitet dank Transition); Bewegung danach zieht weiter.
+    // Click on the track (or a dot) -> set the level (glides thanks to the transition); movement afterwards keeps dragging.
     track.addEventListener("pointerdown", (e) => {
-      if (e.target === handle) return; // Handle hat eigenes Drag-Handling
+      if (e.target === handle) return; // the handle has its own drag handling
       e.preventDefault();
       set(stepFromClientX(e.clientX), true);
       pendingDrag = true;
@@ -2108,10 +2108,10 @@
     track.addEventListener("pointerup", endDrag);
     track.addEventListener("pointercancel", endDrag);
 
-    // Range-Input (Pfeiltasten/Tastatur) ändert den Wert.
+    // Range input (arrow keys/keyboard) changes the value.
     range.addEventListener("input", () => set(Number(range.value), true));
 
-    // --- Öffnen/Schließen (gespiegelt von buildModelMenu) ---
+    // --- Open/close (mirrored from buildModelMenu) ---
     function isOpen() { return menu.getAttribute("data-open") === "true"; }
     function place() {
       placeFixedMenu(menu, btn, "right");
@@ -2121,18 +2121,18 @@
       if (closeOpenMenu && closeOpenMenu !== close) closeOpenMenu();
       closeOpenMenu = close;
       place();
-      paint(); // Layout-abhängige Positionen erst nach place() berechnen
+      paint(); // compute layout-dependent positions only after place()
       menu.setAttribute("data-open", "true");
       if (btn) btn.setAttribute("aria-expanded", "true");
-      // Fokus auf das Range-Input, damit Pfeiltasten sofort greifen (Escape bubbelt zum Menu).
+      // Focus the range input so arrow keys work immediately (Escape bubbles up to the menu).
       range.focus();
-      syncEnergy(); // Energie ggf. starten (jetzt ist isOpen() true)
+      syncEnergy(); // start the energy if applicable (isOpen() is now true)
     }
     function close() {
       if (!isOpen()) return;
       menu.setAttribute("data-open", "false");
       if (btn) btn.setAttribute("aria-expanded", "false");
-      syncEnergy(); // Energie stoppen
+      syncEnergy(); // stop the energy
     }
 
     if (btn) {
@@ -2151,8 +2151,8 @@
   }
 
   // ---------- Ollama ----------
-  // Bestes verfügbares Chat-Modell als Standard (statt einfach das erste): größer + fähige Familie
-  // + Coder-Bonus (gut fürs Code/Website-Erstellen); lokal vor Cloud; Vision/Embed nicht als Chat-Default.
+  // Best available chat model as the default (instead of just the first): larger + capable family
+  // + coder bonus (good for creating code/websites); local before cloud; vision/embed not as the chat default.
   function modelScore(name) {
     const n = String(name).toLowerCase();
     const m = n.match(/(\d+(?:\.\d+)?)\s*b\b/);
@@ -2170,10 +2170,10 @@
     return best;
   }
 
-  // ---------- Kontextfenster-Schutz: num_ctx explizit anfordern (kein stilles Abschneiden) ----------
-  const CTX_CAP = 65536;      // Deckel gegen absurde KV-Cache-Allokationen bei Riesen-Fenstern
-  const CTX_FALLBACK = 8192;  // konservativ, wenn /api/show nichts liefert
-  // Kontextfenster eines Modells (POST /api/show, einmal je Modell gecacht). Wirft nie.
+  // ---------- Context-window protection: request num_ctx explicitly (no silent truncation) ----------
+  const CTX_CAP = 65536;      // cap against absurd KV-cache allocations for huge windows
+  const CTX_FALLBACK = 8192;  // conservative when /api/show returns nothing
+  // Context window of a model (POST /api/show, cached once per model). Never throws.
   async function contextLength(name) {
     if (ctxLen[name]) return ctxLen[name];
     let v = 0;
@@ -2185,13 +2185,13 @@
       const j = await r.json();
       const info = (j && j.model_info) || {};
       for (const k in info) { if (/\.context_length$/.test(k)) { v = +info[k] || 0; break; } }
-      if (j && Array.isArray(j.capabilities)) modelCaps[name] = j.capabilities; // z. B. ["completion","tools","thinking"]
+      if (j && Array.isArray(j.capabilities)) modelCaps[name] = j.capabilities; // e.g. ["completion","tools","thinking"]
     } catch (e) {}
     ctxLen[name] = v || CTX_FALLBACK;
     return ctxLen[name];
   }
-  // Grobe Token-Schätzung des kompletten Chat-Payloads (System-Prompt + RAG + GESAMTER Verlauf).
-  // chars/4 + Bild-Pauschale, Sicherheitsfaktor 1.15 — bewusst konservativ (lieber überschätzen).
+  // Rough token estimate of the full chat payload (system prompt + RAG + the ENTIRE history).
+  // chars/4 + a flat per-image amount, safety factor 1.15 — deliberately conservative (rather overestimate).
   function estimateChatTokens() {
     let chars = 0, images = 0;
     try { chars += systemPrompt().length; } catch (e) {}
@@ -2202,14 +2202,14 @@
     });
     return Math.ceil((chars / 4 + images * 1100) * 1.15);
   }
-  let connectRetry = 0; // Timer eines geplanten Reconnect-Versuchs (max. einer gleichzeitig)
+  let connectRetry = 0; // timer of a scheduled reconnect attempt (max. one at a time)
   async function connect() {
     if (connectRetry) { clearTimeout(connectRetry); connectRetry = 0; }
     setStatus("busy", tr("status.connecting_ollama"));
     setAssistant("connecting");
     try {
-      // Timeout: ohne ihn hinge "Connecting …" endlos, wenn kein Verbindungs-Slot frei wird
-      // (z. B. Browser-Limit von 6 Verbindungen pro Host durch Downloads in anderen Tabs).
+      // Timeout: without it "Connecting …" would hang forever if no connection slot frees up
+      // (e.g. the browser's limit of 6 connections per host due to downloads in other tabs).
       const r = await fetch(OLLAMA + "/api/tags", { signal: AbortSignal.timeout(12000) });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = await r.json();
@@ -2219,11 +2219,11 @@
         setAssistant("error");
         return;
       }
-      // Embed-Modelle (können nicht chatten) aus der Chat-Modellauswahl ausschließen.
+      // Exclude embed models (can't chat) from the chat model selection.
       const chatNames = names.filter((n) => !/embed|bge-|minilm|arctic/i.test(n));
       const list = chatNames.length ? chatNames : names;
       modelMenu.setOptions(list);
-      if (!model || !list.includes(model)) model = pickBestModel(list);   // stärkstes lokales Modell als Standard
+      if (!model || !list.includes(model)) model = pickBestModel(list);   // strongest local model as the default
       localStorage.setItem(LS_MODEL, model);
       modelMenu.setSelected(model);
       updateModelLabel();
@@ -2232,38 +2232,38 @@
     } catch (e) {
       setStatus("error", tr("status.ollama_down"));
       setAssistant("error");
-      // Selbstheilung: alle 8 s erneut versuchen (Ollama startet noch / Slots wieder frei).
+      // Self-healing: retry every 8 s (Ollama still starting / slots free again).
       if (!connectRetry) connectRetry = setTimeout(function () { connectRetry = 0; connect(); }, 8000);
     }
   }
 
-  // Aufwand -> Ollama-Optionen: höhere Stufe = intelligenter (niedrigere Temperatur,
-  // mehr Token). temperature linear von 0.9 (Niedrig) bis 0.2 (Ultracode).
-  // ---------- Notizen & Erinnerungen ----------
+  // Effort -> Ollama options: higher level = smarter (lower temperature,
+  // more tokens). temperature linear from 0.9 (Low) to 0.2 (Ultracode).
+  // ---------- Notes & reminders ----------
   const LS_NOTES = "jarvis.notes";
   const LS_REMINDERS = "jarvis.reminders";
   function loadJSONArr(k) { try { const a = JSON.parse(localStorage.getItem(k) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
   let notes = loadJSONArr(LS_NOTES);
   let reminders = loadJSONArr(LS_REMINDERS);
-  const notesRenderers = []; // Overlays (Anpassen + Notizen) registrieren hier ihre Render-Funktion
+  const notesRenderers = []; // overlays (Customize + Notes) register their render function here
   function notifyNotes() { notesRenderers.forEach(function (fn) { try { fn(); } catch (e) {} }); }
   function saveNotes() { try { localStorage.setItem(LS_NOTES, JSON.stringify(notes)); } catch (e) {} notifyNotes(); }
   function saveReminders() { try { localStorage.setItem(LS_REMINDERS, JSON.stringify(reminders)); } catch (e) {} notifyNotes(); }
   function addNote(text) { const t = (text || "").trim(); if (!t) return false; notes.unshift({ t: t, ts: Date.now() }); saveNotes(); return true; }
   function addReminder(text, dueTs) { const t = (text || "").trim(); if (!t || !dueTs) return false; reminders.push({ t: t, at: dueTs }); saveReminders(); return true; }
   function checkReminders() {
-    if (busy || currentUtter || currentAudio) return; // nicht in laufende Generierung/Sprachausgabe platzen
+    if (busy || currentUtter || currentAudio) return; // don't barge into a running generation/speech
     const now = Date.now(); const due = reminders.filter(function (r) { return r.at <= now; });
     if (!due.length) return;
     reminders = reminders.filter(function (r) { return r.at > now; });
     saveReminders();
     const texts = due.map(function (r) { return r.t; });
     const turn = addAssistantText(texts.length > 1 ? "**" + tr("notes.reminders_head") + "**\n- " + texts.join("\n- ") : "**" + tr("notes.reminder_head") + "** " + texts[0]);
-    if (voiceOut) speak(tr("notes.reminder_head") + " " + texts.join(". "), turn && turn.speakBtn); // EINE Sprachausgabe für alle fälligen
+    if (voiceOut) speak(tr("notes.reminder_head") + " " + texts.join(". "), turn && turn.speakBtn); // ONE speech for all due ones
     try { if (window.Notification && Notification.permission === "granted") texts.forEach(function (t) { new Notification(tr("notif.reminder"), { body: t }); }); } catch (e) {}
   }
 
-  // ---------- Werkzeuge (Tool-Calling über Ollama) ----------
+  // ---------- Tools (tool calling via Ollama) ----------
   const TOOL_DEFS = [
     { type: "function", function: { name: "get_datetime", description: "Current date and time.", parameters: { type: "object", properties: {}, required: [] } } },
     { type: "function", function: { name: "calculate", description: "Evaluates a mathematical expression (basic arithmetic, parentheses, %).", parameters: { type: "object", properties: { expression: { type: "string", description: "e.g. (23*19)+5" } }, required: ["expression"] } } },
@@ -2272,7 +2272,7 @@
     { type: "function", function: { name: "add_note", description: "Saves a note for the user.", parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"] } } },
     { type: "function", function: { name: "add_reminder", description: "Creates a reminder in N minutes.", parameters: { type: "object", properties: { text: { type: "string" }, in_minutes: { type: "number" } }, required: ["text", "in_minutes"] } } },
   ];
-  // ---------- Lokale Fähigkeiten (Aktions-Server 7864) als weitere Tools ----------
+  // ---------- Local capabilities (action server 7864) as further tools ----------
   function tdef(name, desc, props, req) { return { type: "function", function: { name: name, description: desc, parameters: { type: "object", properties: props, required: req || [] } } }; }
   TOOL_DEFS.push(
     tdef("open_website", "Opens a website/URL in the default browser.", { url: { type: "string" } }, ["url"]),
@@ -2296,14 +2296,14 @@
   function safeCalc(expr) {
     const s = String(expr || "").replace(/,/g, ".");
     if (!/^[0-9+\-*/().%\seE]+$/.test(s)) throw new Error("invalid expression");
-    const v = Function('"use strict";return (' + s + ")")(); // nur Zahlen/Operatoren erlaubt (oben validiert)
+    const v = Function('"use strict";return (' + s + ")")(); // only numbers/operators allowed (validated above)
     if (typeof v !== "number" || !isFinite(v)) throw new Error("no result");
     return v;
   }
-  // Echte Websuche über den lokalen Such-Server (DuckDuckGo, tools/search-server.py, Port 7863);
-  // Fallback: Wikipedia, falls der Server nicht läuft. Liefert [{title,url,snippet}].
+  // Real web search via the local search server (DuckDuckGo, tools/search-server.py, port 7863);
+  // fallback: Wikipedia if the server isn't running. Returns [{title,url,snippet}].
   const SEARCH = "http://127.0.0.1:7863";
-  let webSources = []; // Quellen dieses Turns – ask() zeigt sie als Karte unter der Antwort
+  let webSources = []; // sources for this turn – ask() shows them as a card below the answer
   async function searchWeb(query) {
     try {
       const r = await fetch(SEARCH + "/search?q=" + encodeURIComponent(query) + "&n=8");
@@ -2311,8 +2311,8 @@
         const j = await r.json();
         if (j.results && j.results.length) return j.results;
       }
-    } catch (e) {} // Such-Server nicht gestartet -> Wikipedia
-    const wiki = langCfg().code; // Wikipedia-Sprache folgt der gewählten Sprache
+    } catch (e) {} // search server not started -> Wikipedia
+    const wiki = langCfg().code; // Wikipedia language follows the selected language
     const u = "https://" + wiki + ".wikipedia.org/w/api.php?action=query&list=search&srlimit=6&format=json&origin=*&srsearch=" + encodeURIComponent(query);
     const j = await (await fetch(u)).json();
     return ((j.query && j.query.search) || []).map(function (h) {
@@ -2329,8 +2329,8 @@
     webSources.push.apply(webSources, res);
     return res.map(function (r, i) { return "[" + (i + 1) + "] " + r.title + " – " + r.url + "\n" + r.snippet; }).join("\n\n");
   }
-  // Quellen-Karte unter der Antwort (wie bei Perplexity): Favicon-Stapel + "N Quellen",
-  // Klick klappt die Liste mit anklickbaren Links auf.
+  // Sources card below the answer (like Perplexity): favicon stack + "N sources",
+  // clicking expands the list with clickable links.
   function domainOf(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return u; } }
   function favImg(u) {
     const img = document.createElement("img");
@@ -2346,8 +2346,8 @@
     const seen = {};
     const list = sources.filter(function (s) { if (!s.url || seen[s.url]) return false; seen[s.url] = 1; return true; });
     if (!list.length) return;
-    // Pille sitzt in der Fußzeilen-Toolbar zwischen Vorlesen-Button und Zeit; die Toolbar wird
-    // für Quellen-Turns dauerhaft eingeblendet (sonst wären die Quellen nur beim Hovern sichtbar).
+    // The pill sits in the footer toolbar between the read-aloud button and the time; the toolbar is
+    // shown permanently for source turns (otherwise the sources would only be visible on hover).
     const tools = turn.speakBtn.parentNode;
     const time = tools.querySelector("time");
     tools.classList.add("jarvis-has-src");
@@ -2359,7 +2359,7 @@
     pill.appendChild(icons);
     pill.appendChild(el("span", "jarvis-src-count", list.length + " " + (list.length === 1 ? tr("src.one") : tr("src.many"))));
     tools.insertBefore(pill, time || null);
-    // Liste klappt UNTER der Fußzeile auf (zu, bis die Pille geklickt wird).
+    // The list expands BELOW the footer (closed until the pill is clicked).
     const panel = el("div", "jarvis-src-list");
     panel.setAttribute("hidden", "");
     list.forEach(function (s, i) {
@@ -2368,7 +2368,7 @@
       a.href = s.url;
       a.target = "_blank";
       a.rel = "noopener";
-      a.style.animationDelay = Math.min(i * 30, 240) + "ms"; // kurzer Kaskaden-Einlauf
+      a.style.animationDelay = Math.min(i * 30, 240) + "ms"; // short cascading entrance
       a.appendChild(favImg(s.url));
       const tw = el("span", "jarvis-src-text");
       const t = el("span", "jarvis-src-title"); t.textContent = s.title || s.url;
@@ -2377,7 +2377,7 @@
       a.appendChild(tw);
       panel.appendChild(a);
     });
-    tools.parentNode.insertAdjacentElement("afterend", panel); // nach der Fußzeile (foot)
+    tools.parentNode.insertAdjacentElement("afterend", panel); // after the footer (foot)
     pill.addEventListener("click", function () {
       const open = panel.hasAttribute("hidden");
       if (open) panel.removeAttribute("hidden"); else panel.setAttribute("hidden", "");
@@ -2387,21 +2387,21 @@
   async function toolWeather(loc) {
     const g = await (await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&language=de&format=json&name=" + encodeURIComponent(loc))).json();
     const p = g.results && g.results[0];
-    if (!p) return "Ort nicht gefunden.";
+    if (!p) return "Location not found.";
     const w = await (await fetch("https://api.open-meteo.com/v1/forecast?current=temperature_2m,wind_speed_10m,relative_humidity_2m&timezone=auto&latitude=" + p.latitude + "&longitude=" + p.longitude)).json();
     const c = w.current || {};
-    return p.name + (p.country ? ", " + p.country : "") + ": " + c.temperature_2m + "°C, Wind " + c.wind_speed_10m + " km/h, Luftfeuchte " + c.relative_humidity_2m + "%.";
+    return p.name + (p.country ? ", " + p.country : "") + ": " + c.temperature_2m + "°C, wind " + c.wind_speed_10m + " km/h, humidity " + c.relative_humidity_2m + "%.";
   }
-  // ---------- Aktions-Server-Anbindung (Chips + Bestätigung im aktuellen Antwort-Turn) ----------
-  // activeTurn wird in ask() gesetzt, sobald der Turn steht: { body, md }. Chips/Confirm erscheinen
-  // OBERHALB des Streaming-Markdowns (md), im Kontext genau der Antwort, zu der sie gehören.
+  // ---------- Action-server integration (chips + confirmation in the current answer turn) ----------
+  // activeTurn is set in ask() once the turn exists: { body, md }. Chips/confirm appear
+  // ABOVE the streaming markdown (md), in the context of exactly the answer they belong to.
   let activeTurn = null;
-  let pendingConfirm = null; // laufender Bestätigungsdialog (für stopEverything/Abbruch)
+  let pendingConfirm = null; // running confirmation dialog (for stopEverything/cancel)
   function addActionChip(label, icon, kind) {
     if (!activeTurn) return null;
     if (!activeTurn.chips) {
       activeTurn.chips = el("div", "jarvis-act-chips");
-      activeTurn.body.insertBefore(activeTurn.chips, activeTurn.md); // oberhalb der Antwort
+      activeTurn.body.insertBefore(activeTurn.chips, activeTurn.md); // above the answer
     }
     const c = el("span", "jarvis-act-chip");
     if (kind) c.setAttribute("data-kind", kind);
@@ -2417,7 +2417,7 @@
     if (kind) c.setAttribute("data-kind", kind);
     if (label != null) { const s = c.querySelector("span"); if (s) s.textContent = label; }
   }
-  // Bestätigungsdialog im aktuellen Turn (oberhalb der Antwort). Liefert Promise<boolean>.
+  // Confirmation dialog in the current turn (above the answer). Returns Promise<boolean>.
   function showConfirm(summary) {
     return new Promise(function (resolve) {
       const host = (activeTurn && activeTurn.body) || wrap;
@@ -2436,7 +2436,7 @@
       pendingConfirm = { yes: function () { done(true); }, no: function () { done(false); } };
     });
   }
-  // Ruft einen Aktions-Server-Endpunkt; behandelt {needs_confirm} transparent über showConfirm.
+  // Calls an action-server endpoint; handles {needs_confirm} transparently via showConfirm.
   function callAction(path, body, method) {
     let url = ACTIONS + path;
     const opt = { method: method || "POST", headers: { "Content-Type": "application/json" } };
@@ -2448,7 +2448,7 @@
           const b2 = Object.assign({}, body || {}, { confirm: true, token: j.token });
           return fetch(ACTIONS + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b2) }).then(function (r) { return r.json(); });
         };
-        if (mode === "auto_run") return proceed(); // autonomer Modus: ohne Nachfrage ausführen
+        if (mode === "auto_run") return proceed(); // autonomous mode: run without asking
         return showConfirm(j.summary || ("Action “" + (j.action || path) + "”.")).then(function (ok) {
           if (!ok) return { _refused: true };
           return proceed();
@@ -2457,7 +2457,7 @@
       return j;
     });
   }
-  // Führt eine Aktion aus, zeigt einen Chip (pending→done/error) und liefert einen kurzen Text fürs Modell.
+  // Runs an action, shows a chip (pending→done/error), and returns a short text for the model.
   async function actionCall(chipLabel, icon, fn) {
     const chip = addActionChip(chipLabel, icon, "pending");
     try {
@@ -2490,7 +2490,7 @@
     if (name === "get_weather") return await toolWeather(args.location || "");
     if (name === "add_note") { addNote(args.text || ""); return "Note saved."; }
     if (name === "add_reminder") { const m = Number(args.in_minutes) || 0; if (m <= 0) return "Time missing."; addReminder(args.text || "", Date.now() + m * 60000); return "Reminder set in " + m + " minutes."; }
-    // ----- Lokale Fähigkeiten über den Aktions-Server (Chip-Label via tr, Tool-Ergebnis modellseitig englisch) -----
+    // ----- Local capabilities via the action server (chip label via tr, tool result in English for the model) -----
     if (name === "open_website") return actionCall(tr("act.open_website"), "globe", function () { return callAction("/open_url", { url: args.url }).then(fmtOk("Opened: " + args.url)); });
     if (name === "open_app") return actionCall(tr("act.open_app"), "terminal", function () { return callAction("/open_app", { name: args.name }).then(fmtOk("Opened: " + args.name)); });
     if (name === "system_info") return actionCall(tr("act.system_info"), "info", function () { return callAction("/system_info", null, "GET").then(sysToText); });
@@ -2503,7 +2503,7 @@
     if (name === "browse_page") return actionCall(tr("act.read_page"), "book", function () { return callAction("/browse_page", { url: args.url }).then(function (j) { return j.title ? (j.title + "\n\n" + (j.text || "")) : (j.error || "No content."); }); });
     if (name === "send_email") return actionCall(tr("act.email"), "send", function () { return callAction("/send_email", { to: args.to, subject: args.subject, body: args.body }).then(fmtOk("Sent to " + args.to)); });
     if (name === "run_computer_task") return actionCall(tr("act.pc_task"), "sparkle", function () { return callAction("/agent_task", { goal: args.goal, max_steps: 6 }).then(function (j) { if (j && (j._refused || j.error)) return j; return j.summary || j.result || (j.steps ? j.steps.length + " steps executed." : "Done."); }); });
-    // create_website / create_file: KEIN Aktions-Chip – die Artefakt-Karte (Code + Preview) ist die Darstellung.
+    // create_website / create_file: NO action chip – the artifact card (code + preview) is the representation.
     if (name === "create_website") {
       const files = [{ path: "index.html", content: args.html || ("<!doctype html><meta charset=utf-8><title>" + (args.name || "Website") + "</title><h1>" + (args.name || "Website") + "</h1>") }];
       if (args.css) files.push({ path: "style.css", content: args.css });
@@ -2540,9 +2540,9 @@
     }
     return "Unknown tool.";
   }
-  // ---------- Wissensbasis (RAG): IndexedDB-Vektorspeicher + Ollama-Embeddings ----------
+  // ---------- Knowledge base (RAG): IndexedDB vector store + Ollama embeddings ----------
   const RAG_DB = "jarvis-rag";
-  let ragContext = "";   // pro Turn gesetzt (in submit), in ask() geleert
+  let ragContext = "";   // set per turn (in submit), cleared in ask()
   let ragDB = null;
   function ragOpen() {
     return new Promise(function (resolve, reject) {
@@ -2572,7 +2572,7 @@
   async function ragIngest(name, text) {
     const parts = ragChunk(text);
     if (!parts.length) return 0;
-    const embs = await ragEmbed(parts);            // erst embedden, dann speichern (atomar genug)
+    const embs = await ragEmbed(parts);            // embed first, then store (atomic enough)
     const store = await ragStore("readwrite");
     for (let i = 0; i < parts.length; i++) store.add({ doc: name, text: parts[i], vec: embs[i] || [] });
     return new Promise(function (resolve, reject) { store.transaction.oncomplete = function () { resolve(parts.length); }; store.transaction.onerror = function () { reject(store.transaction.error); }; });
@@ -2600,21 +2600,21 @@
   }
 
   function effortOptions() {
-    // Keine Token-Limits (num_predict:-1 = unbegrenzt). Temperatur sinkt mit dem Aufwand
-    // (0.9 Niedrig -> 0.2 Genius); die spürbaren Hebel sind effortStyle() + Thinking-Schaltung.
+    // No token limits (num_predict:-1 = unlimited). Temperature drops with the effort
+    // (0.9 Low -> 0.2 Genius); the noticeable levers are effortStyle() + the thinking toggle.
     const temperature = +(0.9 - (0.7 * effort) / 5).toFixed(2);
     return { temperature: temperature, num_predict: -1 };
   }
-  // Aufwand -> spürbares Antwortverhalten (an den System-Prompt angehängt):
-  // 0-1 = knapp & direkt (schnell fertig), 2-3 = neutral, 4-5 = gründlich & selbstprüfend.
+  // Effort -> noticeable answer behavior (appended to the system prompt):
+  // 0-1 = brief & direct (done fast), 2-3 = neutral, 4-5 = thorough & self-checking.
   function effortStyle() {
     if (effort <= 1) return "\n\nRespond as briefly and directly as possible. No preamble, no filler, no unnecessary caveats. Keep code examples minimal.";
     if (effort >= 4) return "\n\nReason carefully and thoroughly before answering. Double-check facts, logic and code for errors. Prefer correctness and completeness over brevity.";
     return "";
   }
-  // Thinking-Modelle (qwen3, deepseek-r1, gpt-oss, …): Aufwand schaltet das Nachdenken.
-  // 0-2 aus (deutlich schnellere Antworten), 3 = Modell-Standard, 4-5 an (schlauere Antworten).
-  // gpt-oss kennt kein Abschalten, nur Stufen low/medium/high.
+  // Thinking models (qwen3, deepseek-r1, gpt-oss, …): effort toggles the reasoning.
+  // 0-2 off (noticeably faster answers), 3 = model default, 4-5 on (smarter answers).
+  // gpt-oss can't be turned off, only levels low/medium/high.
   function effortThink() {
     const caps = modelCaps[model];
     if (!caps || caps.indexOf("thinking") < 0) return undefined;
@@ -2624,28 +2624,28 @@
     return undefined;
   }
 
-  // Sporadische Ollama-Fehler, die ein erneuter Versuch meist behebt: der gemma4-Ausgabe-Parser
-  // ("does not match the expected … format") oder ein abgebrochener llama-runner. NICHT wiederholbar
-  // sind echte Fehler wie "unable to load model" oder "model not found".
+  // Sporadic Ollama errors that a retry usually fixes: the gemma4 output parser
+  // ("does not match the expected … format") or an aborted llama runner. NOT retryable
+  // are real errors like "unable to load model" or "model not found".
   function isTransientOllamaError(msg) {
     const m = String(msg || "").toLowerCase();
     if (/unable to load model|not found|no such model|kein modell/.test(m)) return false;
     return /does not match the expected|server_error|llama-server chat error|llama runner|runner process|chat error/.test(m);
   }
 
-  // Ein einzelner /api/chat-Versuch: streamt (als gerendertes Markdown) in den Container, liefert den
-  // Roh-Text zurück, wirft bei Fehler. `out` ist der .epitaxy-markdown-Container.
-  // `optOverride`: überschreibt einzelne effortOptions()-Werte (z. B. num_predict:-1 beim Neuversuch
-  // nach einer am Token-Limit abgeschnittenen Antwort).
+  // A single /api/chat attempt: streams (as rendered markdown) into the container, returns the
+  // raw text, throws on error. `out` is the .epitaxy-markdown container.
+  // `optOverride`: overrides individual effortOptions() values (e.g. num_predict:-1 on the retry
+  // after an answer that was cut off at the token limit).
   async function chatStreamOnce(out, useTools, optOverride) {
     let acc = "", doneReason = "";
     const toolCalls = [];
-    streamArts = []; // Streaming-Artefakte des vorherigen Durchlaufs verwerfen (neuer Ordinal-Raum)
+    streamArts = []; // discard the previous pass's streaming artifacts (new ordinal space)
     const sys = [{ role: "system", content: systemPrompt() + effortStyle() }];
-    if (ragContext) sys.push({ role: "system", content: ragContext }); // Wissensbasis-Auszüge (pro Turn, nicht in History)
+    if (ragContext) sys.push({ role: "system", content: ragContext }); // knowledge-base excerpts (per turn, not in history)
     const opt = Object.assign(effortOptions(), optOverride || {});
-    // Kontextfenster explizit anfordern: ohne num_ctx nutzt Ollama den Modell-Default (~4k) und
-    // schneidet lange Verläufe STILL serverseitig ab. Bedarf*1.3, gedeckelt aufs Modellfenster.
+    // Request the context window explicitly: without num_ctx, Ollama uses the model default (~4k) and
+    // truncates long histories SILENTLY server-side. Need*1.3, capped to the model window.
     const win = Math.min(ctxLen[model] || CTX_FALLBACK, CTX_CAP);
     opt.num_ctx = Math.min(win, Math.max(4096, Math.ceil(estimateChatTokens() * 1.3)));
     const body = {
@@ -2667,7 +2667,7 @@
         try { const j = JSON.parse(b); if (j && j.error) msg = j.error; }
         catch (e) { if (b) msg = b.slice(0, 300); }
       } catch (e) {}
-      // Manche Modelle lehnen die Thinking-Schaltung ab -> einmal ohne "think" wiederholen.
+      // Some models reject the thinking toggle -> retry once without "think".
       if (body.think !== undefined && /think/i.test(msg)) {
         delete body.think;
         res = await fetch(OLLAMA + "/api/chat", {
@@ -2678,7 +2678,7 @@
         throw new Error(msg);
       }
     }
-    if (!res.body) throw new Error("Ollama antwortet ohne Datenstrom.");
+    if (!res.body) throw new Error("Ollama responded without a data stream.");
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
@@ -2712,84 +2712,84 @@
     const turn = addAssistantTurn();
     const md = el("div", "epitaxy-markdown");
     turn.body.appendChild(md);
-    activeTurn = { body: turn.body, md: md, chips: null }; // Ziel für Aktions-Chips/Bestätigung dieses Turns
+    activeTurn = { body: turn.body, md: md, chips: null }; // target for this turn's action chips/confirmation
     turn.article.classList.add("jarvis-streaming");
     turn.startThinking();
     const MAX_TRIES = 3;
     let acc = "";
-    const msgsBase = messages.length; // Rollback-Punkt: unvollständigen Tool-Austausch bei Fehler/Fallback verwerfen
+    const msgsBase = messages.length; // rollback point: discard an incomplete tool exchange on error/fallback
     try {
       if (!model) await connect();
       if (!model) throw new Error("No model available.");
-      await contextLength(model); // Fenster cachen -> num_ctx im Request korrekt
+      await contextLength(model); // cache the window -> num_ctx correct in the request
 
-      let useTools = profile.tools !== false;   // Modell ohne Tool-Support fällt automatisch zurück
-      let round = 0;                              // Tool-Runden (gegen Endlosschleifen begrenzt)
+      let useTools = profile.tools !== false;   // a model without tool support falls back automatically
+      let round = 0;                              // tool rounds (bounded against infinite loops)
       while (true) {
         md.innerHTML = "";
         let r;
         for (let attempt = 1; ; attempt++) {
           try { r = await chatStreamOnce(md, useTools); break; }
           catch (e) {
-            // Modell unterstützt keine Werkzeuge -> ohne Tools neu versuchen.
+            // Model doesn't support tools -> retry without tools.
             if (useTools && /tool|function.?call/i.test(e.message) && /support|registry|unknown|invalid/i.test(e.message)) {
-              useTools = false; round = 0; messages.length = msgsBase; // Tool-Teilaustausch verwerfen, sauber ohne Tools neu
+              useTools = false; round = 0; messages.length = msgsBase; // discard the partial tool exchange, cleanly retry without tools
               continue;
             }
-            if (attempt < MAX_TRIES && isTransientOllamaError(e.message)) { setStatus("busy", "Neuer Versuch …"); continue; }
+            if (attempt < MAX_TRIES && isTransientOllamaError(e.message)) { setStatus("busy", "Retrying …"); continue; }
             if (/unable to load model/i.test(e.message)) {
               throw new Error("Model could not be loaded – your Ollama version may not support this architecture. Update Ollama or choose another model.");
             }
             throw e;
           }
         }
-        // Werkzeug-Aufrufe ausführen und Ergebnisse zurückspeisen, dann erneut antworten lassen.
+        // Execute tool calls and feed the results back, then let it answer again.
         if (useTools && r.tool_calls && r.tool_calls.length && round < 5) {
           setStatus("busy", tr("status.using_tools"));
           messages.push({ role: "assistant", content: r.content || "", tool_calls: r.tool_calls });
           for (let k = 0; k < r.tool_calls.length; k++) {
             const tc = r.tool_calls[k] || {}; const nm = (tc.function && tc.function.name) || "";
-            if (!nm) { messages.push({ role: "tool", tool_name: "", content: "(invalid tool call)" }); continue; } // Zyklus ausbalanciert halten
+            if (!nm) { messages.push({ role: "tool", tool_name: "", content: "(invalid tool call)" }); continue; } // keep the cycle balanced
             let a = tc.function && tc.function.arguments; if (typeof a === "string") { try { a = JSON.parse(a); } catch (e) { a = {}; } }
             let outp; try { outp = await runTool(nm, a || {}); } catch (e) { outp = "Error: " + e.message; }
             messages.push({ role: "tool", tool_name: nm, content: String(outp) });
           }
           round++;
-          continue; // nächste Runde: Modell formuliert die Antwort mit den Tool-Ergebnissen
+          continue; // next round: the model phrases the answer using the tool results
         }
         acc = r.content;
-        // Aufwand-Limit (num_predict) hat mitten im Satz gestoppt (done_reason "length"): einmal ohne
-        // Token-Limit komplett neu generieren -> natürliches Ende garantiert. (Prefill-Fortsetzung wäre
-        // billiger, ist aber Template-Sache des Modells: gemma4 liefert dann leer, andere starten neu.)
+        // The effort limit (num_predict) stopped mid-sentence (done_reason "length"): regenerate once
+        // completely without a token limit -> a natural ending guaranteed. (A prefill continuation would be
+        // cheaper, but is the model's template concern: gemma4 then returns empty, others start over.)
         if (r.doneReason === "length") {
           setStatus("busy", tr("status.answer_truncated"));
           md.innerHTML = "";
           try {
             const r2 = await chatStreamOnce(md, false, { num_predict: -1 });
             if (r2.content) acc = r2.content;
-            else renderAnswer(md, acc); // leerer Neuversuch -> gekürzte Antwort behalten
-          } catch (e) { renderAnswer(md, acc); } // Neuversuch scheiterte -> gekürzte Antwort behalten
+            else renderAnswer(md, acc); // empty retry -> keep the truncated answer
+          } catch (e) { renderAnswer(md, acc); } // retry failed -> keep the truncated answer
         }
         break;
       }
 
       turn.article.classList.remove("jarvis-streaming");
       if (!acc) {
-        // Kein Text vom Modell. Hat der Turn schon etwas erzeugt (Artefakt-Karte / Aktions-Chip),
-        // steht das für sich -> keinen Platzhalter zeigen. Sonst eine kurze lokalisierte Meldung.
+        // No text from the model. If the turn already produced something (artifact card / action chip),
+        // it stands on its own -> don't show a placeholder. Otherwise a short localized message.
         const produced = !!(activeTurn && activeTurn.body && (activeTurn.body.querySelector(".jv-artifact-card") || activeTurn.chips));
         acc = produced ? "" : tr("chat.empty_answer");
       }
       renderAnswer(md, acc);
       turn.h2.textContent = tr("turn.answered") + acc;
       turn.finish();
-      if (webSources.length) renderSources(turn, webSources); // Quellen-Pille in der Fußzeile + Liste darunter
+      if (webSources.length) renderSources(turn, webSources); // sources pill in the footer + list below
       messages.push({ role: "assistant", content: acc });
-      setStatus("ok", "Verbunden");
+      setStatus("ok", "Connected");
       setAssistant("ready");
       if (voiceOut) speak(acc, turn.speakBtn);
     } catch (err) {
-      messages.length = msgsBase; // unvollständigen Tool-Austausch dieser Runde verwerfen -> History bleibt gültig
+      messages.length = msgsBase; // discard this round's incomplete tool exchange -> history stays valid
       turn.article.classList.remove("jarvis-streaming");
       turn.body.innerHTML = "";
       const p = el("p", "jarvis-turn-error", tr("turn.error") + err.message);
@@ -2799,15 +2799,15 @@
       setAssistant("error");
     } finally {
       busy = false;
-      activeTurn = null; // Aktions-Chips/Bestätigung nur für diesen Turn
-      ragContext = ""; // Wissensbasis-Kontext nur für diesen Turn
-      webSources = []; // Websuche-Quellen nur für diesen Turn
-      streamArts = []; // Streaming-Artefakte sind finalisiert -> nicht in fremde Renders leaken
-      try { window.dispatchEvent(new Event("jv-turn-done")); } catch (e) {} // Chat persistieren + Recents aktualisieren
+      activeTurn = null; // action chips/confirmation only for this turn
+      ragContext = ""; // knowledge-base context only for this turn
+      webSources = []; // web-search sources only for this turn
+      streamArts = []; // streaming artifacts are finalized -> don't leak into other renders
+      try { window.dispatchEvent(new Event("jv-turn-done")); } catch (e) {} // persist the chat + update recents
     }
   }
 
-  // Erkennt eine Bild-Bearbeitungs-Absicht (DE/EN). Greift nur, wenn ein Bild angehängt ist.
+  // Detects an image-editing intent (DE/EN). Only applies when an image is attached.
   function isEditIntent(t) {
     return /\b(bearbeite\w*|bearbeitung|ändere|ändern|ändre|tausche?|tauschen|austausch\w*|ersetze?|ersetzen|entferne?|entfernen|verwandle\w*|wandle|edit|replace|swap|remove)\b/i.test(t) ||
       /\bfüge\b[\s\S]*\bhinzu\b/i.test(t) ||
@@ -2815,29 +2815,29 @@
       /\bturn\b[\s\S]*\binto\b/i.test(t);
   }
 
-  // ---------- Senden ----------
+  // ---------- Send ----------
   async function submit() {
     if (busy) return;
     const text = getInputText();
 
-    // Bild-Befehl: /bild | /image | /img <Beschreibung>  -> Text-zu-Bild (Z-Image).
+    // Image command: /bild | /image | /img <description>  -> text-to-image (Z-Image).
     const img = text.match(/^\/(?:bild|image|img)(?:\s+([\s\S]+))?$/i);
     if (img) {
       clearInput();
       const prompt = (img[1] || "").trim();
-      addBubble("user", prompt || text, text); // Bubble ohne "/bild"-Präfix; Neu-Senden mit Befehl
+      addBubble("user", prompt || text, text); // bubble without the "/bild" prefix; resend with the command
       if (!prompt) {
-        addAssistantText("Nutzung: /bild <Beschreibung> – z. B. /bild ein roter Fuchs im Schnee, Aquarell");
+        addAssistantText("Usage: /bild <description> – e.g. /bild a red fox in the snow, watercolor");
         return;
       }
       await generateImage(prompt);
       return;
     }
 
-    // Notiz-Befehl: /notiz|/note <Text>
+    // Note command: /notiz|/note <text>
     const noteCmd = text.match(/^\/(?:notiz|note)\s+([\s\S]+)/i);
     if (noteCmd) { clearInput(); addBubble("user", text); addNote(noteCmd[1].trim()); addAssistantText(tr("chat.note_saved", { x: noteCmd[1].trim() })); return; }
-    // Erinnerung: "erinnere mich / remind me in N min/stunden [an] …"
+    // Reminder: "erinnere mich / remind me in N min/hours [an] …"
     const remCmd = text.match(/^(?:erinnere mich|remind me)\s+in\s+(\d+)\s*(min\w*|std\w*|stunden?|hours?|h)\b\s*(?:an\s+|to\s+|,\s*)?([\s\S]+)/i);
     if (remCmd) {
       clearInput(); addBubble("user", text);
@@ -2847,12 +2847,12 @@
       return;
     }
 
-    // Websuche: /web <Frage> – Wikipedia-Treffer als Kontext für diesen Turn, dann antwortet das Modell damit.
+    // Web search: /web <question> – Wikipedia hits as context for this turn, then the model answers with them.
     const webCmd = text.match(/^\/(?:web|websuche)(?:\s+([\s\S]+))?$/i);
     if (webCmd) {
       clearInput();
       const q = (webCmd[1] || "").trim();
-      addBubble("user", q || text, text); // Bubble ohne "/web"-Präfix; Neu-Senden mit Befehl
+      addBubble("user", q || text, text); // bubble without the "/web" prefix; resend with the command
       if (!q) {
         addAssistantText(tr("chat.web_usage"));
         return;
@@ -2870,14 +2870,14 @@
 
     if (!text && !attachments.length) return;
 
-    // Gedächtnis: „Merk dir, dass …" -> Fakt lokal speichern, kurze Bestätigung, kein Modell-Aufruf.
+    // Memory: "Remember that …" -> store the fact locally, short confirmation, no model call.
     if (!attachments.length) {
       const fact = parseRemember(text);
       if (fact) {
         clearInput();
         addBubble("user", text);
         if (profile.memories.indexOf(fact) === -1) { profile.memories.push(fact); saveProfile(); }
-        addAssistantText("Alles klar – ich hab mir gemerkt: " + fact);
+        addAssistantText("Got it – I've remembered: " + fact);
         return;
       }
     }
@@ -2885,7 +2885,7 @@
     const atts = attachments.slice();
     const imgAtts = atts.filter(function (a) { return a.kind === "image"; });
 
-    // Bild-Bearbeitung: Bild angehängt + Bearbeitungs-Absicht -> img2img (Z-Image), kein Ollama-Chat.
+    // Image editing: image attached + editing intent -> img2img (Z-Image), no Ollama chat.
     if (imgAtts.length && text && isEditIntent(text)) {
       clearInput();
       addUserBubble(text, atts);
@@ -2895,7 +2895,7 @@
       return;
     }
 
-    // sonst: (Vision-)Chat – Bilder ans Modell, Textdateien in den Inhalt einbetten.
+    // otherwise: (vision) chat – images to the model, embed text files into the content.
     const imgB64 = imgAtts.map(function (a) { return a.b64; });
     let content = "";
     atts.forEach(function (a) {
@@ -2919,7 +2919,7 @@
     await ask();
   }
 
-  // User-Bubble mit optionalen Anhängen (Bild-Thumbnails / Datei-Pills) + Text.
+  // User bubble with optional attachments (image thumbnails / file pills) + text.
   function addUserBubble(text, atts) {
     hideWelcome();
     const row = el("div", "jarvis-msg user");
@@ -2954,14 +2954,14 @@
     return b;
   }
 
-  // Bild-Job (Erzeugen ODER Bearbeiten) über den lokalen Z-Image-Server, Ergebnis als Transkript-Eintrag.
+  // Image job (generate OR edit) via the local Z-Image server, result as a transcript entry.
   async function runImageJob(endpoint, payload, loadingText) {
     busy = true;
     setStatus("busy", loadingText);
     setAssistant("thinking");
     const turn = addAssistantTurn();
     turn.startThinking();
-    // Skeleton-Platzhalter (Shimmer), bis das Bild da ist.
+    // Skeleton placeholder (shimmer) until the image is here.
     const skel = el("div", "jarvis-img-skel");
     const cap = el("div", "jarvis-img-loading", loadingText);
     turn.body.append(skel, cap);
@@ -3007,12 +3007,12 @@
     }
   }
 
-  // Text -> Bild
+  // Text -> image
   function generateImage(prompt) {
     return runImageJob("/generate", { prompt: prompt, steps: 9, width: 1024, height: 1024 }, tr("status.gen_image"));
   }
 
-  // Bild + Anweisung -> bearbeitetes Bild (img2img)
+  // Image + instruction -> edited image (img2img)
   function editImage(prompt, dataUrl) {
     return runImageJob("/edit", { prompt: prompt, image: dataUrl, strength: 0.72, steps: 12 }, tr("status.edit_image"));
   }
@@ -3023,16 +3023,16 @@
       submit();
     }
   });
-  input.addEventListener("input", syncInputEmpty); // Platzhalter beim Tippen/Löschen aktualisieren
+  input.addEventListener("input", syncInputEmpty); // update the placeholder while typing/deleting
   if (sendBtn) sendBtn.addEventListener("click", (e) => { e.preventDefault(); submit(); }, true);
 
-  // ---------- Sprachausgabe (TTS) ----------
+  // ---------- Speech output (TTS) ----------
   let voices = [];
   function loadVoices() { try { voices = speechSynthesis.getVoices() || []; } catch (e) {} }
   loadVoices();
   if (typeof speechSynthesis !== "undefined") speechSynthesis.onvoiceschanged = loadVoices;
 
-  // Status des lokalen XTTS-Servers (hyperrealistische Stimmen). Fallback: Web Speech.
+  // Status of the local XTTS server (hyper-realistic voices). Fallback: Web Speech.
   const ttsLocal = { ready: false, voices: [], languages: [] };
   async function ttsHealth() {
     try {
@@ -3054,24 +3054,24 @@
     return voices.find((v) => v.lang && v.lang.toLowerCase().startsWith(pref)) || voices[0] || null;
   }
 
-  let currentUtter = null;   // aktive Web-Speech-Äußerung
-  let currentAudio = null;   // aktives <audio> (lokales XTTS)
-  let speakSeq = 0;          // entwertet abgelöste/abgebrochene Anfragen
+  let currentUtter = null;   // active Web Speech utterance
+  let currentAudio = null;   // active <audio> (local XTTS)
+  let speakSeq = 0;          // invalidates superseded/cancelled requests
   function stopPlayback() {
     speakSeq++;
     try { speechSynthesis.cancel(); } catch (e) {}
     currentUtter = null;
     if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
   }
-  // Vorlesen abbrechen + Button zurück auf ▷
+  // Cancel reading aloud + button back to ▷
   function stopSpeak() {
     const was = !!currentUtter || !!currentAudio;
     stopPlayback();
     resetSpeakBtn();
     if (was && !busy) setAssistant("ready");
   }
-  // Dispatcher: lokaler XTTS-Server bevorzugt, sonst Web Speech.
-  // ---------- TTS-Textaufbereitung (Zahlen -> Wörter, Emojis/unbekannte Zeichen/URLs raus) ----------
+  // Dispatcher: local XTTS server preferred, otherwise Web Speech.
+  // ---------- TTS text preparation (numbers -> words, strip emojis/unknown chars/URLs) ----------
   function _enU20(n) { return ["null", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"][n]; }
   function _enTens(n) { return ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"][n]; }
   function _enU100(n) { if (n < 20) return n === 0 ? "" : _enU20(n); var t = _enTens(Math.floor(n / 10)), o = n % 10; return o ? t + "-" + _enU20(o) : t; }
@@ -3084,7 +3084,7 @@
   function _deInt(n) { if (n === 0) return "null"; var out = "", rem = n; [[1000000000000, "Billion", "Billionen"], [1000000000, "Milliarde", "Milliarden"], [1000000, "Million", "Millionen"], [1000, "tausend", "tausend"]].forEach(function (sc) { var q = Math.floor(rem / sc[0]); if (q > 0) { rem = rem % sc[0]; if (sc[0] === 1000) out += (q === 1 ? "ein" : _deU1000(q)) + "tausend"; else out += (q === 1 ? "eine " : _deU1000(q) + " ") + (q === 1 ? sc[1] : sc[2]) + " "; } }); if (rem > 0) out += _deU1000(rem); return out.replace(/\s+/g, " ").trim(); }
   function ttsNumberToWords(numStr, lc) {
     var toInt = lc === "de" ? _deInt : _enInt, s = numStr;
-    if (/^\d{1,3}([.,]\d{3})+$/.test(s)) s = s.replace(/[.,]/g, "");   // Tausender-Trenner entfernen
+    if (/^\d{1,3}([.,]\d{3})+$/.test(s)) s = s.replace(/[.,]/g, "");   // remove thousands separators
     var m = s.match(/^(\d+)(?:[.,](\d+))?$/); if (!m) return numStr;
     var whole = parseInt(m[1], 10), frac = m[2];
     if (whole > 999999999999) return m[1].split("").map(function (d) { return toInt(+d); }).join(" ");
@@ -3094,15 +3094,15 @@
   }
   function normalizeForTts(text, lc) {
     var t = String(text || "");
-    t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}]/gu, " "); // Emojis/Symbole
-    t = t.replace(/\bhttps?:\/\/\S+/gi, " ").replace(/\b[\w.-]+\.(?:com|net|org|de|io|ai|dev|co|gov|edu|info)\b\S*/gi, " "); // URLs/Domains
-    t = t.replace(/[*_`#>|~]+/g, " ");                                   // Markdown-Reste
-    if (lc === "de" || lc === "en") t = t.replace(/\d[\d.,]*\d|\d/g, function (m) { return " " + ttsNumberToWords(m, lc) + " "; }); // Zahlen -> Wörter
-    t = t.replace(/[^\p{L}\s.,!?;:'"()\-–—]/gu, " ");                    // unbekannte/nicht-sprechbare Zeichen raus
-    t = t.replace(/\s+/g, " ").replace(/\s+([.,!?;:])/g, "$1");          // Leerzeichen normalisieren, verwaiste Satzzeichen anlegen
+    t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}]/gu, " "); // emojis/symbols
+    t = t.replace(/\bhttps?:\/\/\S+/gi, " ").replace(/\b[\w.-]+\.(?:com|net|org|de|io|ai|dev|co|gov|edu|info)\b\S*/gi, " "); // URLs/domains
+    t = t.replace(/[*_`#>|~]+/g, " ");                                   // leftover markdown
+    if (lc === "de" || lc === "en") t = t.replace(/\d[\d.,]*\d|\d/g, function (m) { return " " + ttsNumberToWords(m, lc) + " "; }); // numbers -> words
+    t = t.replace(/[^\p{L}\s.,!?;:'"()\-–—]/gu, " ");                    // strip unknown/non-speakable characters
+    t = t.replace(/\s+/g, " ").replace(/\s+([.,!?;:])/g, "$1");          // normalize spaces, reattach orphaned punctuation
     return t.trim();
   }
-  // Text in Sätze zerlegen (für satzweises Vorlesen; sehr lange Sätze zusätzlich an Kommas splitten).
+  // Split text into sentences (for sentence-by-sentence reading; split very long sentences at commas too).
   function splitSentences(text) {
     var raw = text.match(/[^.!?…]+[.!?…]+|\S[^.!?…]*$/g) || [text], out = [];
     raw.forEach(function (p) { p = p.trim(); if (!p) return; if (out.length && (p.length < 4 || /^[.,;:!?…]/.test(p))) out[out.length - 1] += " " + p; else out.push(p); });
@@ -3115,8 +3115,8 @@
     });
     return fin.length ? fin : [text];
   }
-  // Sätze nacheinander synthetisieren + abspielen; der nächste Satz wird schon geholt, während der
-  // aktuelle läuft (früher Sprechbeginn, geringe Latenz). synth(satz) -> Promise<Blob>.
+  // Synthesize + play sentences one after another; the next sentence is already fetched while the
+  // current one plays (earlier speaking start, low latency). synth(sentence) -> Promise<Blob>.
   function speakBlobQueue(sentences, synth, btn, fallback) {
     var my = ++speakSeq;
     if (btn) { activeSpeakBtn = btn; setSpeakBtnState(btn, true); }
@@ -3151,8 +3151,8 @@
     else if (profile.engine === "local" && ttsLocal.ready) speakLocal(sentences, btn);
     else speakBrowser(sentences, btn);
   }
-  // Audio-Blob (von lokalem XTTS oder ElevenLabs) abspielen + Button/Orb verwalten.
-  // Lautstärke der Sprachausgabe (0..1, geclamped) – gilt für XTTS/ElevenLabs (<audio>) UND Browser (utterance).
+  // Play an audio blob (from local XTTS or ElevenLabs) + manage the button/orb.
+  // Speech-output volume (0..1, clamped) – applies to XTTS/ElevenLabs (<audio>) AND browser (utterance).
   function ttsVolume() { let v = parseFloat(profile.volume); if (isNaN(v)) v = 1; return v < 0 ? 0 : v > 1 ? 1 : v; }
   function playTtsBlob(blob, btn, my) {
     if (my !== speakSeq) return;
@@ -3165,14 +3165,14 @@
     audio.onended = fin; audio.onerror = fin;
     audio.play().catch(function () { fin(); });
   }
-  // ---------- ElevenLabs (eigener API-Key; Vorhören über preview_url = KEINE Credits) ----------
+  // ---------- ElevenLabs (own API key; previewing via preview_url = NO credits) ----------
   const EL_API = "https://api.elevenlabs.io/v1";
-  const EL_V2_VOICES = "https://api.elevenlabs.io/v2/voices"; // paginiert (next_page_token)
-  let elevenVoices = [];                 // [{voice_id,name,language,preview_url}] – wächst während des Ladens
+  const EL_V2_VOICES = "https://api.elevenlabs.io/v2/voices"; // paginated (next_page_token)
+  let elevenVoices = [];                 // [{voice_id,name,language,preview_url}] – grows while loading
   const elPreview = {};                  // voice_id -> preview_url
-  let previewAudio = null;               // Vorhören (Samples) – getrennt vom echten Sprechen
-  let elLoading = false, elError = "", elSeq = 0; // Lade-Status für die Stimmen-Liste
-  // Sprachnamen/Locale -> 2-Buchstaben-Code (für Stimmen-Filter nach Sprache).
+  let previewAudio = null;               // previewing (samples) – separate from real speaking
+  let elLoading = false, elError = "", elSeq = 0; // loading state for the voice list
+  // Language name/locale -> 2-letter code (for filtering voices by language).
   function langNameToCode(s) {
     s = String(s || "").trim().toLowerCase(); if (!s) return "";
     if (/^[a-z]{2}$/.test(s)) return s;
@@ -3180,17 +3180,17 @@
     for (var k in map) { if (s.indexOf(k) !== -1) return map[k]; }
     return "";
   }
-  // Sprach-Codes, die eine ElevenLabs-Stimme kann (leer = unbekannt -> als mehrsprachig behandeln).
+  // Language codes an ElevenLabs voice supports (empty = unknown -> treat as multilingual).
   function elVoiceLangs(v) {
     var set = {}, lab = v.labels || {};
     (v.verified_languages || []).forEach(function (x) { var c = String(x.language || x.locale || "").slice(0, 2).toLowerCase(); if (/^[a-z]{2}$/.test(c)) set[c] = 1; });
     [lab.language, lab.accent, lab.descriptive].forEach(function (s) { var c = langNameToCode(s); if (c) set[c] = 1; });
     return Object.keys(set);
   }
-  // Soll die Stimme in der gewählten Sprache erscheinen? Unbekannt oder mehrsprachig (>=3) -> überall.
+  // Should the voice appear in the selected language? Unknown or multilingual (>=3) -> everywhere.
   function voiceInLang(langs, sel) { return !langs || langs.length === 0 || langs.length >= 3 || langs.indexOf(sel) !== -1; }
-  // Wenn die Sprache wechselt und die gewählte Stimme nicht (mehr) dazu passt: sinnvoll zurücksetzen.
-  // XTTS-Sprecher sind mehrsprachig (jeder spricht jede Sprache) -> keine Anpassung nötig.
+  // When the language changes and the selected voice no longer fits: reset it sensibly.
+  // XTTS speakers are multilingual (each speaks every language) -> no adjustment needed.
   function syncVoiceToLang() {
     var sel = langCfg().code;
     if (profile.engine === "browser" && profile.voiceURI) {
@@ -3206,60 +3206,60 @@
     if (v.preview_url) elPreview[v.voice_id] = v.preview_url;
     return { voice_id: v.voice_id, name: v.name, preview_url: v.preview_url || "", language: lab.language || lab.accent || lab.descriptive || "", langs: elVoiceLangs(v) };
   }
-  // Key gegen typische Copy-Paste-Fehler säubern: Zero-Width-Zeichen, umschließende Anführungszeichen,
-  // versehentliches "xi-api-key:"/"Authorization:"/"Bearer "-Präfix.
+  // Clean the key of typical copy-paste errors: zero-width characters, surrounding quotes,
+  // accidental "xi-api-key:"/"Authorization:"/"Bearer " prefix.
   function elCleanKey(k) {
     return String(k || "").replace(/[​-‍﻿]/g, "").trim()
       .replace(/^["']+|["']+$/g, "").replace(/^(xi-api-key|authorization)\s*[:=]\s*/i, "").replace(/^Bearer\s+/i, "").trim();
   }
   function elAuthMsg(status) { return status === 401 ? tr("el.key_invalid") : tr("el.access_denied", { s: status }); }
-  async function elGet(url) { // GET mit Key-Header; wirft Error mit .status bei !ok
+  async function elGet(url) { // GET with the key header; throws an Error with .status on !ok
     const r = await fetch(url, { headers: { "xi-api-key": elCleanKey(profile.elevenKey) } });
     if (!r.ok) { const err = new Error("HTTP " + r.status); err.status = r.status; throw err; }
     return r.json();
   }
-  // Stimmen SEITE FÜR SEITE laden; nach jeder Seite onPage() → Dropdown zeigt das schon Geladene sofort.
+  // Load voices PAGE BY PAGE; after each page onPage() → the dropdown shows what's already loaded immediately.
   async function elFetchVoices(onPage) {
     if (!elCleanKey(profile.elevenKey)) { elevenVoices = []; elError = ""; elLoading = false; return []; }
-    const my = ++elSeq;                   // nur der jüngste Lauf darf schreiben (Race-Schutz beim Tippen)
+    const my = ++elSeq;                   // only the latest run may write (race protection while typing)
     elLoading = true; elError = ""; elevenVoices = [];
     if (typeof onPage === "function") onPage();
     try {
       let token = "", pages = 0;
       do {
         const j = await elGet(EL_V2_VOICES + "?page_size=10" + (token ? "&next_page_token=" + encodeURIComponent(token) : ""));
-        if (my !== elSeq) return elevenVoices;        // abgelöst
+        if (my !== elSeq) return elevenVoices;        // superseded
         (j.voices || []).forEach(function (v) { elevenVoices.push(elMapVoice(v)); });
-        if (typeof onPage === "function") onPage();    // schon geladene Stimmen sofort anzeigen
+        if (typeof onPage === "function") onPage();    // show already-loaded voices immediately
         token = j.next_page_token || ""; pages++;
       } while (token && pages < 80);
     } catch (e) {
       if (e && (e.status === 401 || e.status === 403)) {
-        if (my === elSeq) elError = elAuthMsg(e.status);   // Auth-Fehler: kein v1-Fallback (bringt dasselbe 401)
+        if (my === elSeq) elError = elAuthMsg(e.status);   // auth error: no v1 fallback (would return the same 401)
       } else {
-        try { // Fallback: v1 (alle auf einmal) – nur bei Netz-/sonstigen Fehlern
+        try { // fallback: v1 (all at once) – only for network/other errors
           const j = await elGet(EL_API + "/voices");
           if (my !== elSeq) return elevenVoices;
           elevenVoices = (j.voices || []).map(elMapVoice);
         } catch (e2) {
-          if (my === elSeq) elError = (e2 && (e2.status === 401 || e2.status === 403)) ? elAuthMsg(e2.status) : "Netzwerkfehler";
+          if (my === elSeq) elError = (e2 && (e2.status === 401 || e2.status === 403)) ? elAuthMsg(e2.status) : "Network error";
         }
       }
     }
     if (my === elSeq) {
       elLoading = false;
-      // sinnvoller Default: erste Stimme vorauswählen (ohne Preview/Credits), falls noch keine gewählt
+      // sensible default: preselect the first voice (without preview/credits) if none is chosen yet
       if (!profile.elevenVoice && elevenVoices.length) { profile.elevenVoice = elevenVoices[0].voice_id; saveProfile(); }
       if (typeof onPage === "function") onPage();
     }
     return elevenVoices;
   }
-  function elPlayPreview(voiceId) { // spielt das von ElevenLabs bereitgestellte Sample (keine Credits)
+  function elPlayPreview(voiceId) { // plays the sample provided by ElevenLabs (no credits)
     const u = elPreview[voiceId]; if (!u) return;
     try { if (previewAudio) previewAudio.pause(); } catch (e) {}
     previewAudio = new Audio(u); previewAudio.volume = ttsVolume(); previewAudio.play().catch(function () {});
   }
-  // Echtes TTS via ElevenLabs (verbraucht Credits) – satzweise, mit Prefetch. Fallback auf Browser.
+  // Real TTS via ElevenLabs (consumes credits) – sentence by sentence, with prefetch. Fallback to browser.
   function speakEleven(sentences, btn) {
     speakBlobQueue(sentences, function (s) {
       return fetch(EL_API + "/text-to-speech/" + encodeURIComponent(profile.elevenVoice), {
@@ -3269,16 +3269,16 @@
       }).then(function (r) { if (!r.ok) throw new Error("ElevenLabs " + r.status); return r.blob(); });
     }, btn, function () { resetSpeakBtn(); speakBrowser(sentences, btn); });
   }
-  // Lokal (XTTS): WAV vom Server holen und als <audio> abspielen – satzweise, mit Prefetch.
+  // Local (XTTS): fetch WAV from the server and play it as <audio> – sentence by sentence, with prefetch.
   function speakLocal(sentences, btn) {
     speakBlobQueue(sentences, function (s) {
       return fetch(TTSAPI + "/speak", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: s, voice: profile.voiceLocal || "", language: langCfg().code, speed: profile.rate || 1 }),
       }).then(function (r) { if (!r.ok) throw new Error("TTS " + r.status); return r.blob(); });
-    }, btn, function () { resetSpeakBtn(); speakBrowser(sentences, btn); }); // Fallback auf Web Speech
+    }, btn, function () { resetSpeakBtn(); speakBrowser(sentences, btn); }); // fallback to Web Speech
   }
-  // Browser (Web Speech) – race-sicher; jeder Satz eine Utterance (speechSynthesis reiht sie ein).
+  // Browser (Web Speech) – race-safe; one utterance per sentence (speechSynthesis queues them).
   function speakBrowser(sentences, btn) {
     if (typeof speechSynthesis === "undefined") { resetSpeakBtn(); return; }
     var my = ++speakSeq;
@@ -3295,15 +3295,15 @@
     } catch (e) { currentUtter = null; resetSpeakBtn(); }
   }
 
-  // ---------- Mikrofon (STT) ----------
+  // ---------- Microphone (STT) ----------
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recog = null, listening = false, finalText = "";
-  // Lokales Whisper-STT (offline, genauer) mit Web-Speech-Fallback. Nur fürs Diktat der Frage;
-  // das Wake-Word bleibt bei Web-Speech.
+  // Local Whisper STT (offline, more accurate) with a Web Speech fallback. Only for dictating the question;
+  // the wake word stays on Web Speech.
   let whisperReady = false, whisperRec = null, whisperAC = null;
-  // Mikrofon-Erlaubnis EINMAL pro Session holen. getUserMedia setzt die "microphone"-Permission
-  // sessionweit auf "granted" -> die danach gestartete SpeechRecognition fragt NICHT mehr.
-  // Behebt das ständige file://-Popup (das sonst bei jedem Erkennungs-Start neu kommt).
+  // Get microphone permission ONCE per session. getUserMedia sets the "microphone" permission
+  // to "granted" session-wide -> the SpeechRecognition started afterwards does NOT ask again.
+  // Fixes the constant file:// popup (which otherwise reappears on every recognition start).
   let micState = "idle", micPromise = null; // idle | granted | denied
   function ensureMic() {
     if (micState === "granted") return Promise.resolve(true);
@@ -3330,17 +3330,17 @@
       }
       setInputText(finalText || interim);
     };
-    recog.onerror = (e) => { setStatus("error", "Mikrofon: " + e.error); setAssistant("error"); };
+    recog.onerror = (e) => { setStatus("error", "Microphone: " + e.error); setAssistant("error"); };
     recog.onend = () => {
       listening = false;
       if (micBtn) micBtn.classList.remove("jarvis-listening");
-      if (finalText.trim()) submit(); else { setStatus("ok", "Verbunden"); setAssistant("ready"); }
-      if (profile.wakeEnabled) setTimeout(startWakeWord, 600); // Wake-Word nach dem Diktat reaktivieren
+      if (finalText.trim()) submit(); else { setStatus("ok", "Connected"); setAssistant("ready"); }
+      if (profile.wakeEnabled) setTimeout(startWakeWord, 600); // reactivate the wake word after dictation
     };
-    try { recog.start(); } catch (e) { if (profile.wakeEnabled) setTimeout(startWakeWord, 300); } // Start fehlgeschlagen -> Wake-Word wieder übernehmen (sonst toter Zustand)
+    try { recog.start(); } catch (e) { if (profile.wakeEnabled) setTimeout(startWakeWord, 300); } // start failed -> let the wake word take over again (otherwise a dead state)
   }
 
-  // ----- Lokales Whisper-STT: WAV-Aufnahme + eigene Sprechpausen-Erkennung (VAD) -----
+  // ----- Local Whisper STT: WAV recording + own speech-pause detection (VAD) -----
   function encodeWav(samples, rate) {
     const buf = new ArrayBuffer(44 + samples.length * 2), view = new DataView(buf);
     function ws(o, s) { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); }
@@ -3358,8 +3358,8 @@
     return out;
   }
   function blobToB64(blob) { return new Promise(function (res) { const r = new FileReader(); r.onload = function () { res(String(r.result).split(",")[1] || ""); }; r.readAsDataURL(blob); }); }
-  // Nimmt (eigener getUserMedia-Stream) bis zur Sprechpause auf und transkribiert per Whisper.
-  // cbs.onText(text) am Ende (leerer Text = nichts erkannt); cbs.onFail() = Whisper nicht nutzbar.
+  // Records (its own getUserMedia stream) until a speech pause and transcribes via Whisper.
+  // cbs.onText(text) at the end (empty text = nothing recognized); cbs.onFail() = Whisper unusable.
   function recordWhisper(cbs) {
     let cancelled = false, stopped = false, node = null, source = null, sink = null, stream = null, sr = 16000;
     const chunks = []; let started = false, silence = 0, elapsed = 0;
@@ -3410,7 +3410,7 @@
     }).catch(function () { cbs.onFail && cbs.onFail(); });
     return { cancel: function () { if (stopped) return; cancelled = true; cleanup(); } };
   }
-  // Diktat per Whisper: setzt denselben Mikro-Zustand wie startDictation und speist den Text via submit().
+  // Dictation via Whisper: sets the same mic state as startDictation and feeds the text via submit().
   function startWhisperDictation() {
     finalText = "";
     listening = true;
@@ -3423,18 +3423,18 @@
         if (micBtn) micBtn.classList.remove("jarvis-listening");
         const text = (t || "").trim();
         if (text) { setInputText(text); submit(); }
-        else { setStatus("ok", "Verbunden"); setAssistant("ready"); }
-        if (profile.wakeEnabled) setTimeout(startWakeWord, 600); // Wake-Word nach dem Diktat reaktivieren
+        else { setStatus("ok", "Connected"); setAssistant("ready"); }
+        if (profile.wakeEnabled) setTimeout(startWakeWord, 600); // reactivate the wake word after dictation
       },
       onFail: function () {
         whisperReady = false; whisperRec = null; listening = false;
         if (micBtn) micBtn.classList.remove("jarvis-listening");
-        if (SR) startDictation(); // diese Runde per Web-Speech (setzt Zustand + Wake-Word selbst)
-        else { setStatus("ok", "Verbunden"); setAssistant("ready"); if (profile.wakeEnabled) setTimeout(startWakeWord, 600); }
+        if (SR) startDictation(); // this round via Web Speech (sets the state + wake word itself)
+        else { setStatus("ok", "Connected"); setAssistant("ready"); if (profile.wakeEnabled) setTimeout(startWakeWord, 600); }
       }
     });
   }
-  // Health-/Warmup beim Start: Whisper erkennen und (falls da) das Modell vorladen.
+  // Health/warmup at startup: detect Whisper and (if present) preload the model.
   function whisperHealth() {
     fetch(STT_URL + "/health").then(function (r) { return r.json(); }).then(function (j) {
       whisperReady = !!(j && j.available);
@@ -3443,22 +3443,22 @@
   }
 
   function toggleMic() {
-    // Laufendes Diktat abbrechen (Whisper oder Web-Speech).
+    // Cancel a running dictation (Whisper or Web Speech).
     if (listening) {
       if (whisperRec) {
         try { whisperRec.cancel(); } catch (e) {}
         whisperRec = null; listening = false;
         if (micBtn) micBtn.classList.remove("jarvis-listening");
-        setStatus("ok", "Verbunden"); setAssistant("ready");
+        setStatus("ok", "Connected"); setAssistant("ready");
         if (profile.wakeEnabled) setTimeout(startWakeWord, 400);
         return;
       }
       try { if (recog) recog.stop(); } catch (e) {}
       return;
     }
-    // Lokales Whisper bevorzugen (offline, genauer); sonst Web-Speech.
+    // Prefer local Whisper (offline, more accurate); otherwise Web Speech.
     if (whisperReady) {
-      stopWakeWord(); // Wake-Word und Diktat teilen sich das Mikrofon
+      stopWakeWord(); // wake word and dictation share the microphone
       ensureMic().then(function (ok) {
         if (!ok) { setStatus("error", tr("status.no_mic")); setAssistant("error"); if (profile.wakeEnabled) setTimeout(startWakeWord, 400); return; }
         startWhisperDictation();
@@ -3473,8 +3473,8 @@
   }
   if (micBtn) micBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); toggleMic(); }, true);
 
-  // Custom Dropdown (ersetzt natives <select> – projektweit nur custom Dropdowns/Popups).
-  // getOpts: Array [{value,label}] ODER Funktion, die so ein Array liefert (für dynamische Listen).
+  // Custom dropdown (replaces the native <select> – project-wide only custom dropdowns/popups).
+  // getOpts: array [{value,label}] OR a function returning such an array (for dynamic lists).
   function jvSelect(getOpts, getValue, onChange) {
     function options() { return typeof getOpts === "function" ? (getOpts() || []) : (getOpts || []); }
     const trig = el("button", "jv-sel"); trig.type = "button";
@@ -3496,7 +3496,7 @@
       document.body.appendChild(panel);
     }
     function populate() {
-      const prev = list.childElementCount;     // bereits gezeigte Einträge → nur NEU hinzukommende blenden ein
+      const prev = list.childElementCount;     // entries already shown → only newly added ones fade in
       list.innerHTML = "";
       options().forEach(function (o, idx) {
         const it = el("div", "jv-mm-item" + (prev && idx >= prev ? " jv-mm-new" : "") + (o.disabled ? " jv-mm-disabled" : "")); it.setAttribute("role", "menuitemradio");
@@ -3524,13 +3524,13 @@
       setTimeout(function () { document.addEventListener("mousedown", onDoc, true); }, 0);
     }
     trig.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); isOpen ? close() : open(); });
-    // refresh: Label aktualisieren UND – falls offen – die Liste neu befüllen (für inkrementelles Nachladen)
+    // refresh: update the label AND – if open – repopulate the list (for incremental loading)
     function refresh() { render(); if (isOpen && panel) { populate(); position(); } }
     render();
     return { el: trig, refresh: refresh, close: close };
   }
 
-  // ---------- Anpassen-Zentrale (Overlay): Über dich · Persönlichkeit · Gedächtnis · Anweisungen · Stimme · Aktivierung ----------
+  // ---------- Customize hub (overlay): About you · Personality · Memory · Instructions · Voice · Activation ----------
   function buildAnpassen() {
     const backdrop = el("div", "jv-an-backdrop");
     const modal = el("div", "jv-an");
@@ -3576,7 +3576,7 @@
       sw._sync = sync; sync(); return sw;
     }
 
-    // 1) Über dich
+    // 1) About you
     const s1 = section(tr("an.about_you"));
     const nameIn = input(profile.name, tr("an.name_ph"));
     nameIn.addEventListener("input", function () { profile.name = nameIn.value.trim(); saveProfile(); updateWelcome(); });
@@ -3585,7 +3585,7 @@
     aboutTa.addEventListener("input", function () { profile.about = aboutTa.value.trim(); saveProfile(); });
     s1.appendChild(field(tr("an.profile_short"), aboutTa));
 
-    // 2) Persönlichkeit
+    // 2) Personality
     const s2 = section(tr("an.personality"));
     s2.appendChild(row(tr("an.tone"), segmented([{ v: "locker", label: tr("an.tone.loose") }, { v: "neutral", label: tr("an.tone.neutral") }, { v: "förmlich", label: tr("an.tone.formal") }], function () { return profile.tone; }, function (v) { profile.tone = v; saveProfile(); })));
     const addrIn = input(profile.address, tr("an.address_ph"));
@@ -3594,7 +3594,7 @@
     s2.appendChild(row(tr("an.length"), segmented([{ v: "knapp", label: tr("an.length.short") }, { v: "normal", label: tr("an.length.normal") }, { v: "ausführlich", label: tr("an.length.long") }], function () { return profile.length; }, function (v) { profile.length = v; saveProfile(); })));
     s2.appendChild(row(tr("an.humor"), switchEl(function () { return profile.humor; }, function (v) { profile.humor = v; saveProfile(); })));
 
-    // 3) Gedächtnis
+    // 3) Memory
     const s3 = section(tr("an.memory"), tr("an.memory_hint"));
     const memList = el("div", "jv-an-mem"); s3.appendChild(memList);
     const memAddWrap = el("div", "jv-an-mem-add");
@@ -3617,13 +3617,13 @@
     memIn.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addMem(); } });
     renderMem();
 
-    // 4) Eigene Anweisungen
+    // 4) Custom instructions
     const s4 = section(tr("an.instructions"), tr("an.instructions_hint"));
     const instrTa = textarea(profile.instructions, tr("an.instructions_ph"));
     instrTa.addEventListener("input", function () { profile.instructions = instrTa.value.trim(); saveProfile(); });
     s4.appendChild(instrTa);
 
-    // 4b) Werkzeuge & Notizen
+    // 4b) Tools & notes
     const sT = section(tr("an.tools_notes"), tr("an.tools_notes_hint"));
     sT.appendChild(row(tr("an.use_tools"), switchEl(function () { return profile.tools !== false; }, function (v) { profile.tools = v; saveProfile(); })));
     const noteList = el("div", "jv-an-mem"); sT.appendChild(noteList);
@@ -3649,7 +3649,7 @@
     renderNotes();
     notesRenderers.push(renderNotes);
 
-    // 4c) Wissensbasis (RAG)
+    // 4c) Knowledge base (RAG)
     const sR = section(tr("an.kb"), tr("an.kb_hint", { m: ragEmbedModel() }));
     sR.appendChild(row(tr("an.use_kb"), switchEl(function () { return !!profile.rag; }, function (v) { profile.rag = v; saveProfile(); })));
     const pasteTa = textarea("", tr("an.paste_ph"));
@@ -3664,7 +3664,7 @@
     sR.append(ragBtns, ragStatus, fileIn, ragDocsEl);
     async function renderRagDocs() {
       let docs = []; try { docs = await ragDocList(); } catch (e) {}
-      ragDocsEl.innerHTML = ""; // erst NACH dem await leeren -> keine doppelten Einträge bei parallelen Aufrufen
+      ragDocsEl.innerHTML = ""; // clear only AFTER the await -> no duplicate entries on parallel calls
       if (!docs.length) { ragDocsEl.appendChild(el("div", "jv-an-mem-empty", tr("kb.none"))); return; }
       docs.forEach(function (d) {
         const it = el("div", "jv-an-mem-item"); it.appendChild(el("span", "", d.doc + " (" + tr("an.sections_n", { n: d.chunks }) + ")"));
@@ -3685,7 +3685,7 @@
     fileIn.addEventListener("change", function () { const f = fileIn.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = function () { ragIngestUI(f.name, String(rd.result || "")); }; rd.readAsText(f); fileIn.value = ""; });
     renderRagDocs();
 
-    // 5) Stimme & Sprache (custom Dropdowns statt nativer <select>)
+    // 5) Voice & language (custom dropdowns instead of native <select>)
     const s5 = section(tr("an.voice_lang"), tr("an.hint.voice"));
     const engineDd = jvSelect(
       function () { return [
@@ -3697,7 +3697,7 @@
       function (v) { profile.engine = v; saveProfile(); syncEngineUI(); voiceDd.refresh(); if (v === "elevenlabs" && profile.elevenKey) elFetchVoices(function () { voiceDd.refresh(); }); }
     );
     s5.appendChild(field(tr("an.engine"), engineDd.el));
-    // ElevenLabs API-Key (nur bei Engine ElevenLabs sichtbar). Wird lokal in profile gespeichert.
+    // ElevenLabs API key (only visible when the engine is ElevenLabs). Stored locally in profile.
     const elKeyIn = document.createElement("input"); elKeyIn.type = "password"; elKeyIn.className = "jv-an-input"; elKeyIn.placeholder = tr("an.eleven_key_ph"); elKeyIn.value = profile.elevenKey || ""; elKeyIn.autocomplete = "off"; elKeyIn.spellcheck = false;
     let elKeyTimer = 0;
     elKeyIn.addEventListener("input", function () { profile.elevenKey = elCleanKey(elKeyIn.value); saveProfile(); engineDd.refresh(); clearTimeout(elKeyTimer); elKeyTimer = setTimeout(function () { elFetchVoices(function () { voiceDd.refresh(); }).then(function () { engineDd.refresh(); }); }, 600); });
@@ -3706,23 +3706,23 @@
       function () {
         const sel = langCfg().code;
         if (profile.engine === "elevenlabs") {
-          // nach Sprache filtern; mehrsprachige/unbekannte Stimmen erscheinen in allen Sprachen
+          // filter by language; multilingual/unknown voices appear in all languages
           const list = elevenVoices.filter(function (v) { return voiceInLang(v.langs, sel); }).map(function (v) { return { value: v.voice_id, label: v.name + (v.language ? " – " + v.language : "") }; });
           if (list.length) return elLoading ? list.concat([{ value: "", label: tr("an.voice_more_loading"), disabled: true }]) : list;
           if (elevenVoices.length) return [{ value: "", label: tr("an.voice_none_lang"), disabled: true }];
           return [{ value: "", label: !profile.elevenKey ? tr("an.voice_key_needed") : (elError ? tr("an.voice_error", { x: elError }) : tr("an.voice_loading")), disabled: true }];
         }
         if (profile.engine !== "browser") {
-          // XTTS-Sprecher sind mehrsprachig -> alle anzeigen (Sprache steuert die Aussprache separat)
+          // XTTS speakers are multilingual -> show all (language controls the pronunciation separately)
           const list = (ttsLocal.voices || []).map(function (n) { return { value: n, label: n }; });
           return list.length ? list : [{ value: "", label: tr("an.voice_tts_needed"), disabled: true }];
         }
-        // Browser-Stimmen sind einsprachig -> nur die der gewählten Sprache; „Automatisch“ bleibt immer
+        // Browser voices are monolingual -> only those of the selected language; “Automatic” always stays
         return [{ value: "", label: tr("an.voice_auto") }].concat((voices || []).filter(function (v) { return v.lang && v.lang.slice(0, 2).toLowerCase() === sel; }).map(function (v) { return { value: v.voiceURI, label: v.name + " (" + v.lang + ")" }; }));
       },
       function () { return profile.engine === "elevenlabs" ? (profile.elevenVoice || "") : (profile.engine !== "browser" ? (profile.voiceLocal || "") : (profile.voiceURI || "")); },
       function (v) {
-        if (profile.engine === "elevenlabs") { if (!v) return; profile.elevenVoice = v; saveProfile(); elPlayPreview(v); } // leerer Platzhalter ignorieren; Sample anhören = keine Credits
+        if (profile.engine === "elevenlabs") { if (!v) return; profile.elevenVoice = v; saveProfile(); elPlayPreview(v); } // ignore the empty placeholder; listening to the sample = no credits
         else if (profile.engine !== "browser") { profile.voiceLocal = v; saveProfile(); }
         else { profile.voiceURI = v; saveProfile(); }
       }
@@ -3736,25 +3736,25 @@
     rateRow.append(rate, preview); s5.appendChild(rateRow);
     const volRow = el("div", "jv-an-row"); volRow.appendChild(el("span", "jv-an-row-label", tr("an.volume")));
     const vol = document.createElement("input"); vol.type = "range"; vol.className = "jv-an-range"; vol.min = "0"; vol.max = "1"; vol.step = "0.05"; vol.value = String(profile.volume != null ? profile.volume : 1);
-    vol.addEventListener("input", function () { profile.volume = parseFloat(vol.value); saveProfile(); const v = ttsVolume(); if (currentAudio) currentAudio.volume = v; if (previewAudio) previewAudio.volume = v; }); // laufende Wiedergabe sofort anpassen
+    vol.addEventListener("input", function () { profile.volume = parseFloat(vol.value); saveProfile(); const v = ttsVolume(); if (currentAudio) currentAudio.volume = v; if (previewAudio) previewAudio.volume = v; }); // adjust ongoing playback immediately
     volRow.appendChild(vol); s5.appendChild(volRow);
     function syncEngineUI() { elKeyField.style.display = profile.engine === "elevenlabs" ? "" : "none"; }
     syncEngineUI();
     const langDd = jvSelect(
       LANGS.map(function (l) { return { value: l.code, label: l.label }; }),
       function () { return lang; },
-      function (v) { lang = v; try { localStorage.setItem(LS_LANG, lang); } catch (e) {} syncVoiceToLang(); voiceDd.refresh(); if (window.JV_I18N) JV_I18N.setLang(lang); } // Stimme anpassen, Liste filtern, UI-Sprache umschalten
+      function (v) { lang = v; try { localStorage.setItem(LS_LANG, lang); } catch (e) {} syncVoiceToLang(); voiceDd.refresh(); if (window.JV_I18N) JV_I18N.setLang(lang); } // adjust the voice, filter the list, switch the UI language
     );
     s5.appendChild(field(tr("an.language"), langDd.el));
 
-    // 6) Aktivierung (Wake-Word, experimentell)
+    // 6) Activation (wake word, experimental)
     const s6 = section(tr("an.activation"), tr("an.hint.activation"));
     s6.appendChild(row(tr("an.wake_on"), switchEl(function () { return profile.wakeEnabled; }, function (v) { profile.wakeEnabled = v; saveProfile(); applyWakeWord(); })));
     const wakeIn = input(profile.wakeWord, "Jarvis");
     wakeIn.addEventListener("input", function () { profile.wakeWord = wakeIn.value.trim() || "Jarvis"; saveProfile(); applyWakeWord(); });
     s6.appendChild(row(tr("an.wake_word"), wakeIn));
 
-    // Felder aus `profile` neu setzen (z. B. wenn „Merk dir" im Chat das Gedächtnis ändert)
+    // Reset the fields from `profile` (e.g. when "remember" in the chat changes the memory)
     function syncFromProfile() {
       nameIn.value = profile.name || ""; aboutTa.value = profile.about || "";
       addrIn.value = profile.address || ""; instrTa.value = profile.instructions || "";
@@ -3769,11 +3769,11 @@
 
     function open(target) {
       syncFromProfile();
-      ttsHealth().then(function () { engineDd.refresh(); voiceDd.refresh(); }); // lokale Stimmen/Status aktualisieren
-      if (profile.engine === "elevenlabs" && profile.elevenKey) elFetchVoices(function () { voiceDd.refresh(); }); // Cloud-Stimmen inkrementell laden
+      ttsHealth().then(function () { engineDd.refresh(); voiceDd.refresh(); }); // refresh local voices/status
+      if (profile.engine === "elevenlabs" && profile.elevenKey) elFetchVoices(function () { voiceDd.refresh(); }); // load cloud voices incrementally
       backdrop.setAttribute("data-open", "true");
       setTimeout(function () {
-        if (target) { // zu einer bestimmten Sektion scrollen (Sidebar-Schnellzugriff)
+        if (target) { // scroll to a specific section (sidebar quick access)
           const secs = body.querySelectorAll(".jv-an-sec");
           for (let i = 0; i < secs.length; i++) { const h = secs[i].querySelector(".jv-an-sec-h"); if (h && h.textContent.indexOf(target) !== -1) { secs[i].scrollIntoView({ block: "start" }); return; } }
         }
@@ -3787,7 +3787,7 @@
     return { open: open, close: close };
   }
 
-  // ---------- Wiederverwendbares Overlay (Modal) + kleine UI-Helfer für eigene Popups ----------
+  // ---------- Reusable overlay (modal) + small UI helpers for custom popups ----------
   const X_SVG = HI("x", { size: 13 });
   function buildOverlay(opts) {
     const backdrop = el("div", "jv-an-backdrop" + (opts.cls ? " " + opts.cls : ""));
@@ -3821,7 +3821,7 @@
   }
   function ovDelBtn(onClick) { const d = el("button", "jv-an-mem-del"); d.type = "button"; d.setAttribute("aria-label", tr("an.delete")); d.innerHTML = X_SVG; d.addEventListener("click", onClick); return d; }
 
-  // ---------- Notizen & Erinnerungen (eigenes Popup, bernsteinfarben, schmal) ----------
+  // ---------- Notes & reminders (own popup, amber-colored, narrow) ----------
   function buildNotes() {
     const ov = buildOverlay({ title: tr("notes.title"), width: 460, cls: "jv-ov-notes",
       icon: HI("note", { size: 17 }) });
@@ -3850,7 +3850,7 @@
     return { open: function () { render(); ov.open(); }, close: ov.close };
   }
 
-  // ---------- Wissensbasis (eigenes Popup, blau, breit, Upload-Fokus) ----------
+  // ---------- Knowledge base (own popup, blue, wide, upload-focused) ----------
   function buildKnowledge() {
     const ov = buildOverlay({ title: tr("kb.title"), width: 620, cls: "jv-ov-wissen",
       icon: HI("book", { size: 17 }) });
@@ -3873,19 +3873,19 @@
     return { open: function () { ragSync(); renderDocs(); ov.open(); }, close: ov.close };
   }
 
-  // ---------- Wake-Word (opt-in): kontinuierliche Erkennung löst das Mikrofon aus ----------
-  // Gehärtet: Doppelstart-Schutz, robuster Auto-Neustart mit Backoff, sauberes Stoppen,
-  // kein Endlos-Restart bei verweigertem Mikrofon, Zombie-Schutz (nur aktuelle Instanz startet neu).
+  // ---------- Wake word (opt-in): continuous recognition triggers the microphone ----------
+  // Hardened: double-start guard, robust auto-restart with backoff, clean stopping,
+  // no infinite restart when the microphone is denied, zombie guard (only the current instance restarts).
   let wakeRecog = null, wakeActive = false, wakeStarting = false, wakeRestartTimer = 0, wakeErrors = 0;
-  let wakeBlocked = false; // Mikro in dieser Sitzung verweigert -> keine Neustart-Schleife; die Einstellung bleibt an
+  let wakeBlocked = false; // mic denied this session -> no restart loop; the setting stays on
   function wakeIndicator(on) { if (micBtn) micBtn.classList.toggle("jarvis-wake", !!on); }
   function applyWakeWord() { if (profile.wakeEnabled && SR) { wakeBlocked = false; startWakeWord(); } else stopWakeWord(); }
   function startWakeWord() {
     if (!SR || !profile.wakeEnabled || wakeBlocked || wakeActive || wakeStarting || listening) return;
     wakeStarting = true;
     ensureMic().then(function (granted) {
-      if (!granted) { wakeStarting = false; wakeBlocked = true; return; } // ohne Mikro kein Wake-Word (nur diese Sitzung, Einstellung bleibt an)
-      if (!profile.wakeEnabled || wakeActive || listening) { wakeStarting = false; return; } // Zustand änderte sich während des Wartens
+      if (!granted) { wakeStarting = false; wakeBlocked = true; return; } // no wake word without a mic (this session only, the setting stays on)
+      if (!profile.wakeEnabled || wakeActive || listening) { wakeStarting = false; return; } // state changed while waiting
       try {
       const rec = new SR();
       wakeRecog = rec;
@@ -3900,21 +3900,21 @@
           const t = (e.results[i][0].transcript || "").toLowerCase();
           if (!listening && (t.indexOf(word) !== -1 || t.indexOf("hey " + word) !== -1)) {
             stopWakeWord();
-            toggleMic(); // löst Diktat aus
+            toggleMic(); // triggers dictation
             return;
           }
         }
       };
       rec.onerror = function (ev) {
         wakeActive = false; wakeStarting = false; wakeIndicator(false);
-        if (ev && (ev.error === "not-allowed" || ev.error === "service-not-allowed")) { wakeBlocked = true; return; } // Mikro verweigert -> nicht endlos neu starten (Einstellung bleibt an)
+        if (ev && (ev.error === "not-allowed" || ev.error === "service-not-allowed")) { wakeBlocked = true; return; } // mic denied -> don't restart endlessly (the setting stays on)
         wakeErrors++;
       };
       rec.onend = function () {
         wakeActive = false; wakeStarting = false; wakeIndicator(false);
-        if (wakeRecog !== rec) return; // wurde ersetzt/gestoppt
+        if (wakeRecog !== rec) return; // was replaced/stopped
         if (profile.wakeEnabled && !listening) {
-          const delay = Math.min(400 * Math.max(1, wakeErrors), 4000); // Backoff bei wiederholten Fehlern
+          const delay = Math.min(400 * Math.max(1, wakeErrors), 4000); // backoff on repeated errors
           clearTimeout(wakeRestartTimer); wakeRestartTimer = setTimeout(startWakeWord, delay);
         }
       };
@@ -3930,22 +3930,22 @@
 
   // ---------- Start ----------
   const anpassen = buildAnpassen();
-  // Sidebar-Button „Anpassen" öffnet die Zentrale.
-  // Sprachunabhängig über das data-i18n-Label finden; Text-Fallback für beide Sprachen.
+  // The sidebar "Customize" button opens the hub.
+  // Found language-independently via the data-i18n label; text fallback for both languages.
   let anpassenBtn = null;
   const _custLbl = document.querySelector('[data-i18n="nav.customize"]');
   if (_custLbl && _custLbl.closest) anpassenBtn = _custLbl.closest("button");
   if (!anpassenBtn) anpassenBtn = Array.prototype.filter.call(document.querySelectorAll("button[data-row], aside button, nav button"), function (b) { const t = b.textContent; return t.indexOf("Customize") !== -1 || t.indexOf("Anpassen") !== -1; })[0];
   if (anpassenBtn) anpassenBtn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); anpassen.open(); }, true);
-  // Eigene Popups für Wissen & Notizen (sehen anders aus als die Anpassen-Zentrale).
+  // Custom popups for Knowledge & Notes (look different from the Customize hub).
   const knowledgeUI = buildKnowledge();
   const notesUI = buildNotes();
-  // Sidebar um Schnellzugriffe erweitern (Klon des Anpassen-Buttons -> gleicher Stil, eigenes Icon, eigenes Popup).
+  // Extend the sidebar with quick-access entries (clone of the Customize button -> same style, own icon, own popup).
   function addSidebarEntry(label, onOpen, svg, after) {
     if (!anpassenBtn || !anpassenBtn.parentNode) return after;
     const b = anpassenBtn.cloneNode(true);
     b.removeAttribute("data-selected"); b.removeAttribute("aria-current");
-    // i18n-Marker aus dem Klon entfernen, sonst überschreibt applyStatic (DOMContentLoaded) das eigene Label wieder.
+    // Remove i18n markers from the clone, otherwise applyStatic (DOMContentLoaded) would overwrite the custom label again.
     ["data-i18n", "data-i18n-aria", "data-i18n-ph", "data-i18n-title"].forEach(function (a) {
       if (b.hasAttribute(a)) b.removeAttribute(a);
       b.querySelectorAll("[" + a + "]").forEach(function (x) { x.removeAttribute(a); });
@@ -3961,15 +3961,15 @@
   const ICON_WISSEN = HI("book", { size: 16 });
   const ICON_NOTIZ = HI("note", { size: 16 });
   const wissenEntry = addSidebarEntry(tr("sidebar.knowledge"), function () { knowledgeUI.open(); }, ICON_WISSEN, anpassenBtn);
-  // „Notes" als Sidebar-Eintrag entfernt (Notizen bleiben über Anpassen → „Werkzeuge & Notizen" erreichbar).
-  // „Mehr"- und „Routines"-Einträge aus der Sidebar entfernen (nicht benötigt). Sprachunabhängig über data-i18n bzw. Text.
+  // "Notes" removed as a sidebar entry (notes remain reachable via Customize → "Tools & notes").
+  // Remove the "More" and "Routines" entries from the sidebar (not needed). Language-independent via data-i18n or text.
   Array.prototype.forEach.call(document.querySelectorAll("button span"), function (s) {
     const i18n = s.getAttribute("data-i18n"), txt = s.textContent.trim();
     if (i18n === "nav.more" || i18n === "nav.routines" || txt === "Mehr" || txt === "More" || txt === "Routinen" || txt === "Routines") { const b = s.closest("button"); if (b) b.remove(); }
   });
-  // ================= Chat-Sitzungen: Verlauf speichern + "Recently used" (überlebt Neustart) =========
-  // Chats liegen in localStorage (jarvis.chats). Bilder werden vor dem Speichern gestrippt, damit
-  // das 5-MB-Limit nicht überläuft; die laufende Sitzung behält ihre Bilder im Speicher.
+  // ================= Chat sessions: save history + "Recently used" (survives restart) =========
+  // Chats live in localStorage (jarvis.chats). Images are stripped before saving so
+  // the 5 MB limit doesn't overflow; the running session keeps its images in memory.
   const LS_CHATS = "jarvis.chats";
   const LS_RECSORT = "jarvis.recentsSort";
   let chats = (function () { try { const a = JSON.parse(localStorage.getItem(LS_CHATS) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; } })();
@@ -4011,7 +4011,7 @@
     c.title = chatTitleFrom(messages);
     c.ts = Date.now();
     c.msgs = messages.map(function (m) { return m; });
-    chats = [c].concat(chats.filter(function (x) { return x.id !== c.id; })); // aktuellen nach vorn
+    chats = [c].concat(chats.filter(function (x) { return x.id !== c.id; })); // move the current one to the front
     persistChats();
     renderRecents();
   }
@@ -4062,15 +4062,15 @@
     persistChats();
     if (id === currentChatId) newSession(); else renderRecents();
   }
-  // Speicherpunkt: nach jedem abgeschlossenen Turn (siehe ask()-finally-Hook via window-Event).
+  // Save point: after each completed turn (see the ask() finally hook via a window event).
   window.addEventListener("jv-turn-done", saveCurrentChat);
 
-  // ---- "Recently used"-Liste in der Sidebar aufbauen (ersetzt den Grundgerüst-Platzhalter) ----
+  // ---- Build the "Recently used" list in the sidebar (replaces the scaffold placeholder) ----
   function buildRecentsBox() {
     const label = document.querySelector('[data-i18n="nav.recent"]');
     const scroll = document.querySelector(".dframe-nav-scroll");
     if (!scroll) return null;
-    // Grundgerüst-Platzhalter (Pinned/Drag-to-pin/Recents-Stub) entfernen.
+    // Remove the scaffold placeholders (pinned/drag-to-pin/recents stub).
     scroll.querySelectorAll(".dframe-recents-by-mode").forEach(function (n) { n.remove(); });
     const sect = el("div", "jv-recents-sect");
     const head = el("div", "jv-recents-head");
@@ -4117,16 +4117,16 @@
     });
   }
 
-  // ---- Die drei Chrome-Buttons der Sidebar verdrahten: New session, Collapse, Search ----
+  // ---- Wire up the three chrome buttons of the sidebar: New session, Collapse, Search ----
   (function wireSidebarChrome() {
-    // "New session" (oben, Ctrl+Shift+O)
+    // "New session" (top, Ctrl+Shift+O)
     const newBtn = document.querySelector('[data-i18n="nav.new"]');
     const newRow = newBtn && newBtn.closest("button");
     if (newRow) newRow.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); newSession(); }, true);
     document.addEventListener("keydown", function (e) {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "O" || e.key === "o")) { e.preventDefault(); newSession(); }
     });
-    // Collapse-Sidebar-Button (Panel-Icon oben rechts) + schwebender Wieder-Öffnen-Knopf.
+    // Collapse-sidebar button (panel icon top right) + floating re-open button.
     const collapseBtn = document.getElementById("base-ui-_r_b8_") || document.querySelector('button[aria-label="Collapse sidebar"]');
     const expandBtn = el("button", "jv-sidebar-expand"); expandBtn.type = "button";
     expandBtn.setAttribute("aria-label", tr("sidebar.expand")); expandBtn.title = tr("sidebar.expand");
@@ -4138,12 +4138,12 @@
     }
     if (collapseBtn) collapseBtn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); setCollapsed(true); }, true);
     expandBtn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); setCollapsed(false); });
-    // Such-Button (Lupe) -> Chat-Suche
+    // Search button (magnifier) -> chat search
     const searchBtn = document.getElementById("base-ui-_r_ba_") || document.querySelector('button[aria-label="Search"]');
     if (searchBtn) searchBtn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); openChatSearch(); }, true);
   })();
 
-  // ---- Chat-Suche (Overlay): filtert nach Titel + Nachrichteninhalt, Klick lädt den Chat ----
+  // ---- Chat search (overlay): filters by title + message content, click loads the chat ----
   let searchUI = null;
   function buildChatSearch() {
     const ov = buildOverlay({ title: tr("search.title"), width: 560, icon: HI("search", { size: 18 }), cls: "jv-ov-search" });
@@ -4177,7 +4177,7 @@
   }
   function openChatSearch() { if (!searchUI) searchUI = buildChatSearch(); searchUI.open(); }
 
-  // Sidebar-Icons als HugeIcons setzen (eigenes Markup liefert leere Slots).
+  // Set the sidebar icons as HugeIcons (our own markup provides empty slots).
   (function setSidebarIcons() {
     var cb = document.getElementById("base-ui-_r_b8_"); if (cb) cb.innerHTML = HI("sidebar", { size: 17 });
     var sb = document.getElementById("base-ui-_r_ba_"); if (sb) sb.innerHTML = HI("search", { size: 17 });
@@ -4193,7 +4193,7 @@
   buildRecentsBox();
   renderRecents();
 
-  // Bei UI-Sprachwechsel: dynamisch erzeugte, persistente UI neu beschriften (statische Strings macht i18n.js).
+  // On UI language change: relabel dynamically created, persistent UI (i18n.js handles the static strings).
   if (window.JV_I18N) JV_I18N.onChange(function () {
     try { if (idChip && idChip.relabel) idChip.relabel(); } catch (e) {}
     try { renderVoiceTgl(); } catch (e) {}
@@ -4205,12 +4205,12 @@
   });
   updateWelcome();
   applyWakeWord();
-  ttsHealth(); // lokalen XTTS-Server erkennen (für hyperrealistisches Vorlesen)
-  whisperHealth(); // lokalen Whisper-STT-Server erkennen (offline-Diktat) + vorwärmen
+  ttsHealth(); // detect the local XTTS server (for hyper-realistic reading aloud)
+  whisperHealth(); // detect the local Whisper STT server (offline dictation) + warm it up
   checkReminders();
-  setInterval(checkReminders, 20000); // fällige Erinnerungen prüfen
+  setInterval(checkReminders, 20000); // check for due reminders
   try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
   clearInput();
   connect();
-  console.log("[Oddvark] bereit.");
+  console.log("[Oddvark] ready.");
 })();

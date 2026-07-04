@@ -1,8 +1,8 @@
-/* Oddvark – Chat-/Sprachassistent-UI, nutzt die Design-Tokens aus theme.css */
+/* Oddvark – chat / voice-assistant UI, uses the design tokens from theme.css */
 
-/* Alle Elemente 25% größer, aber weiterhin auf EINEN Bildschirm passend (kein Seiten-Scroll).
-   Trick: Das Layout rechnet mit 80vw/80vh; zoom 1.25 skaliert es exakt auf die volle Viewport-Größe.
-   Dadurch bleibt die Prompt-Box unten sichtbar (nur eben 25% größer). Nur index.html (jarvis.css). */
+/* All elements 25% larger, but still fitting on ONE screen (no page scroll).
+   Trick: the layout is computed with 80vw/80vh; zoom 1.25 scales it exactly to the full viewport size.
+   This keeps the prompt box visible at the bottom (just 25% larger). index.html only (jarvis.css). */
 html.h-screen {
   zoom: 1.25;
   width: 80vw;
@@ -10,17 +10,17 @@ html.h-screen {
   overflow: hidden;
 }
 body.min-h-screen {
-  /* Definite Höhe (nicht nur min-height!), damit das innere h-full/Flex der App
-     dagegen auflösen kann und der Composer unten verankert bleibt. */
+  /* Definite height (not just min-height!) so the app's inner h-full/flex can
+     resolve against it and the composer stays anchored at the bottom. */
   height: 80vh;
   min-height: 80vh;
   overflow: hidden;
 }
-/* Zwischen body und der App liegt ein Wrapper (#root) ohne height:100%, daher
-   bricht die h-full-Kette und die App-Shell wächst auf Inhaltshöhe (Composer unter dem Fold).
-   Wir binden NUR die äußere App-Shell (das Grid, .bg-bg-100) an den Viewport: 80vh ×1.25 zoom = volle Höhe.
-   WICHTIG: nicht einfach `.epitaxy-root` – diese Klasse hängt auch am Slack-Banner und am Overlay,
-   die sonst mit aufgeblasen würden. */
+/* Between body and the app sits a wrapper (#root) without height:100%, so the
+   h-full chain breaks and the app shell grows to content height (composer below the fold).
+   We bind ONLY the outer app shell (the grid, .bg-bg-100) to the viewport: 80vh ×1.25 zoom = full height.
+   IMPORTANT: not just `.epitaxy-root` – that class is also on the Slack banner and the overlay,
+   which would otherwise get inflated too. */
 .epitaxy-root.bg-bg-100 {
   height: 80vh;
   max-height: 80vh;
@@ -36,7 +36,7 @@ body.min-h-screen {
   gap: 14px;
 }
 
-/* Sprachausgabe-Schalter (Lautsprecher-Icon) neben dem Mikrofon in der Bottom-Bar */
+/* Speech-output toggle (speaker icon) next to the microphone in the bottom bar */
 .jarvis-tts-btn {
   display: inline-flex; align-items: center; justify-content: center;
   flex: 0 0 auto;
@@ -51,7 +51,7 @@ body.min-h-screen {
 .jarvis-tts-btn[aria-pressed="true"]:hover { color: hsl(var(--accent-100)); }
 .jarvis-tts-btn:active { transform: scale(0.92); }
 
-/* Modell-Menü (App-Style-Popup am Bottom-Button) */
+/* Model menu (app-style popup on the bottom button) */
 .jv-modelmenu {
   position: fixed;
   z-index: 1000;
@@ -79,7 +79,7 @@ body.min-h-screen {
   transform: none;
   pointer-events: auto;
 }
-/* Linksbündige Variante (Modus-Menü am "Auto"-Button) */
+/* Left-aligned variant (mode menu on the "Auto" button) */
 .jv-modelmenu.jv-mm-left { transform-origin: bottom left; }
 .jv-mm-surface {
   position: absolute;
@@ -118,11 +118,11 @@ body.min-h-screen {
   cursor: default;
   user-select: none;
 }
-/* Inkrementell nachgeladene Einträge (z. B. ElevenLabs-Stimmen) sanft einblenden – kurz, ease-out, kein scale(0). */
+/* Incrementally loaded entries (e.g. ElevenLabs voices) fade in gently – short, ease-out, no scale(0). */
 @keyframes jv-mm-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 .jv-mm-item.jv-mm-new { animation: jv-mm-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 @media (prefers-reduced-motion: reduce) { .jv-mm-item.jv-mm-new { animation: none; } }
-/* Platzhalter/„lädt …"-Einträge: gedämpft, nicht anklickbar, kein Hover-Highlight, kein Haken-Slot-Hover. */
+/* Placeholder / "loading …" entries: dimmed, not clickable, no hover highlight, no checkmark-slot hover. */
 .jv-mm-item.jv-mm-disabled { color: hsl(var(--text-400)); font-style: italic; pointer-events: none; }
 .jv-mm-item.jv-mm-disabled:hover::before { background: transparent; }
 .jv-mm-item::before {
@@ -188,14 +188,14 @@ body.min-h-screen {
   background-clip: padding-box;
 }
 
-/* Wert rechts in den Settings-Zeilen (an/aus, aktuelle Sprache) */
+/* Value on the right in the settings rows (on/off, current language) */
 .jv-mm-val {
   flex: 0 0 auto;
   font-size: 13px;
   color: hsl(var(--text-300));
   white-space: nowrap;
 }
-/* Pill-Toggle-Switch (z. B. "Stimme an/aus"): Knob gleitet per transform (GPU), ease-out. */
+/* Pill toggle switch (e.g. "Voice on/off"): knob slides via transform (GPU), ease-out. */
 .jv-switch {
   position: relative;
   flex: 0 0 auto;
@@ -219,7 +219,7 @@ body.min-h-screen {
 .jv-switch.is-on { background: hsl(var(--accent-100)); }
 .jv-switch.is-on .jv-switch-knob { transform: translateX(14px); }
 
-/* Caret an einer Zeile, die ein Untermenü öffnet (z. B. "Sprache") */
+/* Caret on a row that opens a submenu (e.g. "Language") */
 .jv-mm-caret {
   display: flex;
   align-items: center;
@@ -233,9 +233,9 @@ body.min-h-screen {
 .jv-mm-caret svg { width: 14px; height: 14px; }
 .jv-mm-item:hover .jv-mm-caret,
 .jv-mm-item.is-active .jv-mm-caret { color: hsl(var(--text-300)); }
-/* Sprach-Flyout: liegt IM Popover und wird per position:absolute direkt rechts an die
-   "Sprache"-Zeile gehängt (left:100% = rechte Popover-Kante). Wächst nach oben, daher
-   Ursprung unten links; schmaler als das Modell-Menü. */
+/* Language flyout: sits INSIDE the popover and is attached via position:absolute directly to the
+   right of the "Language" row (left:100% = right popover edge). Grows upward, hence
+   origin bottom left; narrower than the model menu. */
 .jv-submenu {
   position: absolute;
   left: 100%;
@@ -244,7 +244,7 @@ body.min-h-screen {
   min-width: 168px;
 }
 
-/* ---------- Oddvark-Identität in der Sidebar-Fußzeile (ersetzt das Account-Menü) ---------- */
+/* ---------- Oddvark identity in the sidebar footer (replaces the account menu) ---------- */
 .jv-id {
   display: flex;
   align-items: center;
@@ -266,9 +266,9 @@ body.min-h-screen {
 .jv-id:active { transform: scale(0.98); }
 .jv-id:focus-visible { box-shadow: 0 0 0 2px hsl(var(--accent-100) / 0.6); }
 
-/* Marken-Avatar: Oddware-Logo auf heller App-Icon-Kachel. Das Logo ist für hellen
-   Grund gemacht (dunkle Hauptform), daher die helle Kachel – so bleibt es auf der
-   dunklen Fußzeile sichtbar und behält seine echten Farben. */
+/* Brand avatar: Oddware logo on a light app-icon tile. The logo is made for a light
+   background (dark main shape), hence the light tile – this keeps it visible on the
+   dark footer and preserves its true colors. */
 .jv-id-logo {
   width: 22px;
   height: 22px;
@@ -305,7 +305,7 @@ body.min-h-screen {
   white-space: nowrap;
 }
 
-/* Status-Punkt: Farbe je Zustand */
+/* Status dot: color per state */
 .jv-id-dot {
   width: 7px;
   height: 7px;
@@ -320,7 +320,7 @@ body.min-h-screen {
 .jv-id[data-state="speaking"] .jv-id-dot { background: hsl(var(--accent-100)); }
 .jv-id[data-state="connecting"] .jv-id-dot { background: hsl(var(--text-500)); }
 
-/* Der Punkt pulst NUR bei Aktivität – kein Dauer-Geblinke in immer-sichtbarem UI. */
+/* The dot pulses ONLY during activity – no constant blinking in always-visible UI. */
 @keyframes jvPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.35; transform: scale(0.66); }
@@ -339,9 +339,9 @@ body.min-h-screen {
   .jv-switch, .jv-switch-knob { transition: none; }
 }
 
-/* Aufwand-Menü (App-Style-Popup am unteren "Extra"-Button) */
+/* Effort menu (app-style popup on the bottom "Extra" button) */
 .jv-effort {
-  /* Lokale Slider-Vars; bei Ultracode (data-top-stop) auf Lila umgestellt */
+  /* Local slider vars; switched to purple for Ultracode (data-top-stop) */
   --ef-fill: hsl(45 5% 35%);
   --ef-handle: var(--ui-slider-handle, #fff);
   --ef-track: hsl(48 4% 8%);
@@ -367,19 +367,19 @@ body.min-h-screen {
   transform: none;
   pointer-events: auto;
 }
-/* Ultracode: Sonderzustand in Lila für Fill, Handle und Header-Label */
+/* Ultracode: special state in purple for fill, handle and header label */
 .jv-effort[data-top-stop] {
   --ef-fill: var(--extended-purple);
-  /* Pille bleibt im hellen Grau/Weiß wie bei den anderen Stufen – nur einen Tick heller (nicht lila) */
+  /* Pill stays in the light gray/white like the other steps – just a touch lighter (not purple) */
   --ef-handle: #fff;
   --ef-accent: var(--extended-purple);
 }
-/* Bei Ultracode trägt der Fill die Energie-Basis (gleicher Verlauf wie das Canvas in
-   createEnergyAnimation: linear 0..1 = #272929→#242525→#1f1f24). So ist der dunkle
-   Track-Hintergrund (--ef-track) vollständig verdeckt und die durch filter:blur(0.6px)
-   ausfadende Canvas-Kante blendet nahtlos – KEINE dunkle Outline um das Raster. */
+/* In Ultracode the fill carries the energy base (same gradient as the canvas in
+   createEnergyAnimation: linear 0..1 = #272929→#242525→#1f1f24). This fully covers the dark
+   track background (--ef-track) and the canvas edge fading out via filter:blur(0.6px)
+   blends seamlessly – NO dark outline around the grid. */
 .jv-effort[data-top-stop] .jv-ef-fill { background: linear-gradient(90deg, #272929 0%, #242525 40%, #1f1f24 100%); }
-/* Surface heller wie .jv-modelmenu (überschreibt bg-surface-popover) */
+/* Surface lighter like .jv-modelmenu (overrides bg-surface-popover) */
 .jv-ef-surface {
   position: absolute;
   inset: 0;
@@ -402,14 +402,14 @@ body.min-h-screen {
 .jv-ef-title {
   margin: 0;
   flex: 0 0 auto;
-  /* identische Schrift wie "Schneller"/"Intelligenter" (.jv-ef-end) */
+  /* identical typography to "Faster"/"Smarter" (.jv-ef-end) */
   font-family: inherit;
   font-size: 11px;
   font-weight: 400;
   color: var(--t6, hsl(var(--text-500)));
 }
 .jv-ef-level {
-  /* gleiche Schrift wie "Aufwand" (.jv-ef-title), nur etwas heller */
+  /* same typography as "Effort" (.jv-ef-title), just a bit lighter */
   font-family: inherit;
   font-size: 11px;
   font-weight: 400;
@@ -438,7 +438,7 @@ body.min-h-screen {
   font-size: 11px;
   color: var(--t6, hsl(var(--text-500)));
 }
-/* Slider-Bahn – dicker, abgerundeter Balken wie im Original ("Faden") */
+/* Slider track – thicker, rounded bar like the original ("thread") */
 .jv-ef-track {
   position: relative;
   height: 20px;
@@ -446,7 +446,7 @@ body.min-h-screen {
   cursor: pointer;
   touch-action: none;
 }
-/* Die Bahn selbst (Hintergrund) */
+/* The track itself (background) */
 .jv-ef-track::before {
   content: "";
   position: absolute;
@@ -454,7 +454,7 @@ body.min-h-screen {
   border-radius: var(--r5, 6px);
   background: var(--ef-track);
 }
-/* Gefüllter Teil (links), oben links abgerundet, rechts vom Handle verdeckt */
+/* Filled part (left), rounded at top left, covered on the right by the handle */
 .jv-ef-fill {
   position: absolute;
   left: 0;
@@ -463,12 +463,12 @@ body.min-h-screen {
   overflow: hidden;
   border-radius: var(--r5, 6px) 0 0 var(--r5, 6px);
   background: var(--ef-accent);
-  /* background bewusst NICHT animieren: bei 0–4 ist er konstant grau, beim Eintritt in
-     Ultracode verdeckt das Canvas ihn, und Verlauf↔Solid (background-image) ist nicht
-     interpolierbar → würde beim Verlassen von Ultracode einen diskreten dunklen Flash erzeugen. */
+  /* deliberately do NOT animate background: at 0–4 it is constant gray, on entering
+     Ultracode the canvas covers it, and gradient↔solid (background-image) is not
+     interpolable → would produce a discrete dark flash when leaving Ultracode. */
   transition: width 140ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-/* Energie-Animation (Canvas) im Fill – nur bei Ultracode sichtbar (display via JS) */
+/* Energy animation (canvas) in the fill – only visible in Ultracode (display via JS) */
 .jv-ef-energy {
   position: absolute;
   inset: 0;
@@ -476,7 +476,7 @@ body.min-h-screen {
   height: 100%;
   display: none;
   pointer-events: none;
-  filter: blur(0.6px); /* leicht weiche Raster-Zellen */
+  filter: blur(0.6px); /* slightly soft grid cells */
 }
 .jv-ef-dot {
   position: absolute;
@@ -490,17 +490,17 @@ body.min-h-screen {
   transition: opacity 200ms ease;
   pointer-events: none;
 }
-/* Punkte über data-step positionieren – um 14px von den Rändern eingerückt,
-   damit sie enger beieinander sitzen (nativer Look). */
+/* Position dots via data-step – inset 14px from the edges,
+   so they sit closer together (native look). */
 .jv-ef-dot[data-step="0"] { left: 14px; }
 .jv-ef-dot[data-step="1"] { left: calc(14px + (100% - 28px) * 0.2); }
 .jv-ef-dot[data-step="2"] { left: calc(14px + (100% - 28px) * 0.4); }
 .jv-ef-dot[data-step="3"] { left: calc(14px + (100% - 28px) * 0.6); }
 .jv-ef-dot[data-step="4"] { left: calc(14px + (100% - 28px) * 0.8); }
 .jv-ef-dot[data-step="5"] { left: calc(100% - 14px); background: var(--extended-purple); }
-/* Ultracode: Punkte ausblenden, wie im Original */
+/* Ultracode: hide dots, like the original */
 .jv-effort[data-top-stop] .jv-ef-dot { opacity: 0; }
-/* Handle als vertikale Pille */
+/* Handle as a vertical pill */
 .jv-ef-handle {
   position: absolute;
   top: 50%;
@@ -517,12 +517,12 @@ body.min-h-screen {
     background 140ms ease, transform 120ms ease-out;
 }
 .jv-ef-handle:active { cursor: grabbing; transform: translate(-50%, -50%) scaleY(0.92); }
-/* Während des Ziehens keine Positions-Transition – Handle/Fill folgen sofort.
-   Fill: gar keine Transition (sonst diskreter Verlauf↔Solid-Flash beim Ultracode-Wechsel). */
+/* No position transition while dragging – handle/fill follow immediately.
+   Fill: no transition at all (otherwise a discrete gradient↔solid flash on the Ultracode switch). */
 .jv-effort[data-dragging] .jv-ef-fill { transition: none; }
 .jv-effort[data-dragging] .jv-ef-handle { transition: background 140ms ease; cursor: grabbing; }
-/* Verstecktes Range-Input – nur Tastatur/a11y. pointer-events:none, damit die
-   eigenen Track-/Handle-Zeiger-Handler maßgeblich sind (deterministisches Snapping). */
+/* Hidden range input – keyboard/a11y only. pointer-events:none so the
+   custom track/handle pointer handlers take precedence (deterministic snapping). */
 .jv-ef-range {
   position: absolute;
   inset: 0;
@@ -544,8 +544,8 @@ body.min-h-screen {
   .jv-ef-level { transition: none; }
 }
 
-/* Befehls-Chip im Eingabefeld (Plus-Menü: /bild, /web) – farbige Karte mit Icon.
-   contenteditable=false im Editor: wird als Ganzes markiert/gelöscht. */
+/* Command chip in the input field (plus menu: /bild, /web) – colored card with icon.
+   contenteditable=false in the editor: selected/deleted as a whole. */
 .jarvis-cmd-chip {
   display: inline-flex;
   align-items: center;
@@ -563,7 +563,7 @@ body.min-h-screen {
   animation: jarvis-chip-in 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .jarvis-cmd-chip svg { width: 13px; height: 13px; flex: 0 0 auto; }
-/* Text weiß; Farbe über getönten Hintergrund + farbiges Icon: Bild blau, Websuche orange. */
+/* Text white; color via tinted background + colored icon: image blue, web search orange. */
 .jarvis-cmd-chip.is-bild { background: hsl(208 90% 55% / 0.18); }
 .jarvis-cmd-chip.is-bild svg { color: hsl(208 95% 68%); }
 .jarvis-cmd-chip.is-web { background: hsl(28 90% 52% / 0.18); }
@@ -571,7 +571,7 @@ body.min-h-screen {
 @keyframes jarvis-chip-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .jarvis-cmd-chip { animation: none; } }
 
-/* Entfernen-X: erscheint beim Hover über den Chip; Klick entfernt den Befehl. */
+/* Remove X: appears on hover over the chip; click removes the command. */
 .jarvis-cmd-chip { position: relative; }
 .jarvis-cmd-x {
   display: inline-flex;
@@ -597,9 +597,9 @@ body.min-h-screen {
 .jarvis-cmd-x svg { width: 11px; height: 11px; }
 @media (prefers-reduced-motion: reduce) { .jarvis-cmd-x { transition: opacity 130ms ease; } }
 
-/* Quellen der Websuche: Pille in der Fußzeilen-Toolbar (zwischen Vorlesen und Zeit),
-   Link-Liste klappt erst per Klick unter der Fußzeile auf. */
-.jarvis-turn-toolbar.jarvis-has-src { opacity: 1; pointer-events: auto; } /* Toolbar dauerhaft sichtbar, wenn Quellen da sind */
+/* Web-search sources: pill in the footer toolbar (between read-aloud and time),
+   link list only expands on click below the footer. */
+.jarvis-turn-toolbar.jarvis-has-src { opacity: 1; pointer-events: auto; } /* toolbar permanently visible when sources are present */
 .jarvis-src-pill {
   display: inline-flex;
   align-items: center;
@@ -607,7 +607,7 @@ body.min-h-screen {
   padding: 3px 6px;
   border: 0;
   border-radius: 999px;
-  background: transparent; /* keine Karte hinter den Quellen – erscheint erst beim Hovern */
+  background: transparent; /* no card behind the sources – appears only on hover */
   color: hsl(var(--text-100));
   font-size: 12px;
   line-height: 1;
@@ -628,7 +628,7 @@ body.min-h-screen {
 .jarvis-src-icons .jarvis-src-fav { margin-left: -6px; border: 2px solid hsl(48 5% 10%); }
 .jarvis-src-icons .jarvis-src-fav:first-child { margin-left: 0; }
 .jarvis-src-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
-.jarvis-src-list[hidden] { display: none; } /* sonst überschreibt display:flex das hidden-Attribut */
+.jarvis-src-list[hidden] { display: none; } /* otherwise display:flex overrides the hidden attribute */
 .jarvis-src-item {
   display: flex;
   align-items: center;
@@ -655,10 +655,10 @@ body.min-h-screen {
   .jarvis-src-pill:active { transform: none; }
 }
 
-/* Nachrichten */
+/* Messages */
 .jarvis-msg {
   display: flex;
-  /* Kurze Einblend-Animation für jede neu gesendete/empfangene Nachricht (ease-out, leicht von unten). */
+  /* Brief fade-in animation for each newly sent/received message (ease-out, slightly from below). */
   animation: jarvis-msg-in 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 @keyframes jarvis-msg-in {
@@ -674,11 +674,11 @@ body.min-h-screen {
   font-size: 15px;
 }
 .jarvis-msg.user { justify-content: flex-end; }
-/* Text in Bubbles ist markierbar (die Wrapper vererben select-none) */
+/* Text in bubbles is selectable (the wrappers inherit select-none) */
 .jarvis-msg .b { user-select: text; -webkit-user-select: text; }
-/* Kein Ausblend-Verlauf oben über dem Transkript – Nachrichten sollen beim Scrollen nicht verblassen */
+/* No fade-out gradient above the transcript – messages should not fade while scrolling */
 .epitaxy-root .epitaxy-top-scrim { display: none; }
-/* User-Bubble: Spalte aus Bubble + Hover-Aktionen darunter (rechtsbündig, wie die Antwort-Toolbar) */
+/* User bubble: column of bubble + hover actions below it (right-aligned, like the answer toolbar) */
 .jarvis-user-col {
   display: flex;
   flex-direction: column;
@@ -704,22 +704,22 @@ body.min-h-screen {
   border-color: #f8514955;
 }
 
-/* ---------- KI-Antwort als Transkript-Eintrag (ohne Card, gerendertes Markdown) ---------- */
+/* ---------- AI answer as a transcript entry (no card, rendered markdown) ---------- */
 .jarvis-turn { animation: jarvis-msg-in 240ms cubic-bezier(0.23, 1, 0.32, 1) both; }
-/* Fußzeile: während des Denkens "✳ Ns" (sichtbar), danach Toolbar (hover) + relative Zeit (immer). */
+/* Footer: during thinking "✳ Ns" (visible), afterwards toolbar (hover) + relative time (always). */
 .jarvis-turn-foot[data-state="thinking"] .jarvis-turn-toolbar,
 .jarvis-turn-foot[data-state="thinking"] .jarvis-rel { display: none; }
 .jarvis-turn-foot[data-state="done"] .jarvis-thinking { display: none; }
 .jarvis-thinking { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: hsl(var(--text-400)); }
 .jarvis-thinking-t { font-variant-numeric: tabular-nums; }
-/* Toolbar-Inhalte vertikal mittig. */
+/* Toolbar contents vertically centered. */
 .jarvis-turn-toolbar { align-items: center; }
 .jarvis-rel { align-self: center; line-height: 1; }
-/* Vorlesen-Button behält den Hover-Look (Fläche + helleres Icon), solange vorgelesen wird. */
+/* Read-aloud button keeps the hover look (surface + lighter icon) while reading is active. */
 .jarvis-turn-toolbar button.jarvis-speaking { color: var(--t7); }
 .jarvis-turn-toolbar button.jarvis-speaking .btn-squish { background-color: var(--fill-uncontained-hover); }
-/* Turn-Toolbar-Icon-Buttons (Kopieren, Vorlesen, …): eigener transparenter Icon-Button.
-   .btn-squish = Hover/Active-Fläche hinter dem Icon (bleibt beim Vorlesen sichtbar). */
+/* Turn toolbar icon buttons (copy, read-aloud, …): dedicated transparent icon button.
+   .btn-squish = hover/active surface behind the icon (stays visible while reading). */
 .jarvis-turn-btn {
   position: relative; isolation: isolate;
   display: inline-flex; align-items: center; justify-content: center;
@@ -784,19 +784,19 @@ body.min-h-screen {
   .jarvis-turn { animation: jarvis-fade-in 160ms ease both; }
 }
 
-/* Streaming-Cursor */
+/* Streaming cursor */
 .jarvis-typing::after {
   content: "▋";
   margin-left: 1px;
   animation: jarvis-blink 1s steps(2, start) infinite;
 }
 
-/* Mikrofon aktiv: nur rote Färbung (kein Ring) */
+/* Microphone active: red coloring only (no ring) */
 .jarvis-listening { color: #f85149 !important; }
 
 @keyframes jarvis-blink { to { opacity: 0; } }
 
-/* Erzeugtes Bild im Chat */
+/* Generated image in the chat */
 .jarvis-img { margin: 0; }
 .jarvis-img img {
   display: block;
@@ -813,7 +813,7 @@ body.min-h-screen {
   color: hsl(var(--text-400));
   max-width: min(420px, 100%);
 }
-/* Skeleton-Platzhalter (Shimmer) während der Generierung */
+/* Skeleton placeholder (shimmer) during generation */
 .jarvis-img-skel {
   width: min(420px, 60vw);
   aspect-ratio: 1 / 1;
@@ -830,8 +830,8 @@ body.min-h-screen {
 .jarvis-img-loading { margin-top: 8px; font-size: 13px; color: hsl(var(--text-300)); }
 @keyframes jarvis-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
-/* ---------- Datei-Anhänge ("+"-Button) ---------- */
-/* Karten-Sektion oben IN der Prompt-Box (im nativen ausklappbaren Grid-Slot) */
+/* ---------- File attachments ("+" button) ---------- */
+/* Card section at the top INSIDE the prompt box (in the native expandable grid slot) */
 .jarvis-attach {
   position: relative;
   display: flex;
@@ -840,9 +840,9 @@ body.min-h-screen {
   padding: 12px 14px 14px;
 }
 .jarvis-attach:empty { display: none; }
-/* Trennstrich = abgerundete Oberkante des Eingabe-Bereichs: horizontale Linie, deren Enden mit dem
-   Box-Radius (var(--r7)) nach unten kurven und zu null auslaufen. NUR Top-Rahmen (keine Seiten),
-   damit KEIN zweiter Strich neben dem Box-Rahmen entsteht (kein Overlap an der Ecke). */
+/* Divider = rounded top edge of the input area: horizontal line whose ends curve down with the
+   box radius (var(--r7)) and taper to zero. TOP border ONLY (no sides),
+   so NO second line appears next to the box border (no overlap at the corner). */
 .jarvis-attach::after {
   content: "";
   position: absolute;
@@ -910,7 +910,7 @@ body.min-h-screen {
 .jarvis-chip-x:active { transform: scale(0.88); }
 @keyframes jarvis-pop { from { opacity: 0; transform: translateY(4px) scale(0.96); } }
 
-/* Anhänge in der User-Bubble */
+/* Attachments in the user bubble */
 .jarvis-msg-atts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .jarvis-msg-thumb { width: 140px; max-width: 70%; height: auto; border-radius: 8px; display: block; }
 .jarvis-msg-file {
@@ -924,12 +924,12 @@ body.min-h-screen {
   .jarvis-typing::after,
   .jarvis-img-skel,
   .jarvis-chip { animation: none; }
-  /* Bei reduzierter Bewegung nur sanft einblenden, ohne Versatz. */
+  /* With reduced motion, only fade in gently, without offset. */
   .jarvis-msg { animation: jarvis-fade-in 160ms ease both; }
 }
 @keyframes jarvis-fade-in { from { opacity: 0; } }
 
-/* ===================== Anpassen-Zentrale (Overlay-Modal) ===================== */
+/* ===================== Customize center (overlay modal) ===================== */
 .jv-an-backdrop {
   position: fixed;
   inset: 0;
@@ -946,10 +946,10 @@ body.min-h-screen {
   transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .jv-an-backdrop[data-open="true"] { opacity: 1; pointer-events: auto; }
-/* Modal: zentriert (kein getBoundingClientRect -> zoom-sicher), skaliert aus der Mitte ein. */
+/* Modal: centered (no getBoundingClientRect -> zoom-safe), scales in from the center. */
 .jv-an {
   width: min(560px, 100%);
-  /* vh ignoriert html{zoom:1.25} (Chrome) -> 86vh*1.25 würde überlaufen. Daher ~/1.25. */
+  /* vh ignores html{zoom:1.25} (Chrome) -> 86vh*1.25 would overflow. Hence ~/1.25. */
   max-height: 68vh;
   display: flex;
   flex-direction: column;
@@ -1032,7 +1032,7 @@ body.min-h-screen {
 .jv-an-select { cursor: pointer; appearance: none; -webkit-appearance: none; padding-right: 28px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 width=%2212%22 height=%2212%22 fill=%22none%22%3E%3Cpath d=%22M18 9.00005C18 9.00005 13.5811 15 12 15C10.4188 15 6 9 6 9%22 stroke=%22%23999%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-width=%221.5%22/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 9px center; }
-/* Zeile: Label links, Steuerelement rechts */
+/* Row: label left, control right */
 .jv-an-row { display: flex; align-items: center; gap: 12px; min-height: 30px; }
 .jv-an-row-label { flex: 1 1 auto; font-size: 14px; color: hsl(var(--text-200)); }
 .jv-an-row .jv-an-input, .jv-an-row .jv-an-select { width: auto; flex: 0 0 auto; min-width: 150px; }
@@ -1053,7 +1053,7 @@ body.min-h-screen {
 }
 .jv-an-seg-btn:active { transform: scale(0.96); }
 .jv-an-seg-btn.is-on { background: hsl(var(--text-100) / 0.12); color: hsl(var(--text-100)); }
-/* Gedächtnis-Liste */
+/* Memory list */
 .jv-an-mem { display: flex; flex-direction: column; gap: 6px; }
 .jv-an-mem-item {
   display: flex; align-items: center; gap: 8px;
@@ -1083,13 +1083,13 @@ body.min-h-screen {
 .jv-an-btn:active { transform: scale(0.97); }
 .jv-an-btn.is-accent { background: hsl(var(--accent-100) / 0.9); color: #fff; }
 .jv-an-btn.is-accent:hover { background: hsl(var(--accent-100)); }
-/* Tempo-Slider (native range, dezent gestylt) */
+/* Tempo slider (native range, subtly styled) */
 .jv-an-range { flex: 0 0 auto; width: 150px; accent-color: hsl(var(--accent-100)); cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .jv-an-backdrop, .jv-an, .jv-an-close, .jv-an-seg-btn, .jv-an-btn, .jv-an-mem-del { transition: none; }
 }
 
-/* Custom Dropdown (ersetzt natives <select>) – Trigger sieht aus wie ein Eingabefeld, Panel = .jv-modelmenu */
+/* Custom dropdown (replaces native <select>) – trigger looks like an input field, panel = .jv-modelmenu */
 .jv-sel {
   width: 100%;
   display: inline-flex;
@@ -1113,20 +1113,20 @@ body.min-h-screen {
 .jv-sel-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jv-sel-caret { flex: 0 0 auto; display: inline-flex; align-items: center; color: hsl(var(--text-400)); transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
 .jv-sel[aria-expanded="true"] .jv-sel-caret { transform: rotate(180deg); }
-/* Panel öffnet NACH UNTEN, über dem Modal (z-index > .jv-an-backdrop) */
+/* Panel opens DOWNWARD, above the modal (z-index > .jv-an-backdrop) */
 .jv-sel-menu { z-index: 2100; min-width: 180px; max-height: 240px; transform-origin: top left; transform: scale(0.96) translateY(-4px); }
 .jv-sel-menu[data-open="true"] { transform: none; }
 @media (prefers-reduced-motion: reduce) { .jv-sel-caret { transition: none; } }
 
-/* Wake-Word aktiv: dezenter Akzent-Punkt am Mikrofon-Button */
+/* Wake word active: subtle accent dot on the microphone button */
 .jarvis-wake { position: relative; }
 .jarvis-wake::after { content: ""; position: absolute; top: 1px; right: 1px; width: 5px; height: 5px; border-radius: 50%; background: hsl(var(--accent-100)); box-shadow: 0 0 4px hsl(var(--accent-100)); animation: jarvis-wakepulse 2s ease-in-out infinite; pointer-events: none; }
 @keyframes jarvis-wakepulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) { .jarvis-wake::after { animation: none; } }
 
-/* ===== Eigene Popups: Wissen (blau) & Notizen (bernstein) – optisch klar unterschiedlich ===== */
+/* ===== Custom popups: Knowledge (blue) & Notes (amber) – visually clearly distinct ===== */
 .jv-ov-ico { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; color: hsl(var(--text-300)); }
-/* Notizen – bernstein, schmal */
+/* Notes – amber, narrow */
 .jv-ov-notes .jv-ov-ico { color: hsl(40 95% 60%); }
 .jv-ov-notes .jv-an-head { box-shadow: inset 0 -2px 0 hsl(40 95% 55% / 0.55); }
 .jv-ov-notes .jv-an-btn.is-accent { background: hsl(40 90% 52%); color: #1c1606; }
@@ -1134,7 +1134,7 @@ body.min-h-screen {
 .jv-ov-notes .jv-switch.is-on { background: hsl(40 90% 52%); }
 .jv-ov-notes .jv-an-input:focus, .jv-ov-notes .jv-an-textarea:focus { border-color: hsl(40 90% 55% / 0.7); box-shadow: 0 0 0 2px hsl(40 90% 55% / 0.2); }
 .jv-ov-min { width: 66px; flex: 0 0 auto; text-align: center; }
-/* Wissen – blau, breit, Upload-Fokus */
+/* Knowledge – blue, wide, upload focus */
 .jv-ov-wissen .jv-ov-ico { color: hsl(208 95% 63%); }
 .jv-ov-wissen .jv-an-head { box-shadow: inset 0 -2px 0 hsl(208 95% 58% / 0.55); }
 .jv-ov-wissen .jv-an-btn.is-accent { background: hsl(208 90% 55%); color: #fff; }
@@ -1146,8 +1146,8 @@ body.min-h-screen {
 .jv-ov-drop-t { font-size: 14px; color: hsl(var(--text-200)); }
 .jv-ov-drop-s { font-size: 12px; color: hsl(var(--text-500)); margin-top: 3px; }
 
-/* ===== Lokale Fähigkeiten: Aktions-Chips + Bestätigungsdialog (Aktions-Server) ===== */
-/* Erscheinen OBERHALB der Antwort im aktuellen Turn – Kontext genau bei der Aktion, zu der sie gehören. */
+/* ===== Local capabilities: action chips + confirmation dialog (action server) ===== */
+/* Appear ABOVE the answer in the current turn – context right at the action they belong to. */
 .jarvis-act-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .jarvis-act-chip {
   display: inline-flex;
@@ -1161,23 +1161,23 @@ body.min-h-screen {
   user-select: none;
   color: hsl(var(--text-300));
   background: hsl(var(--text-100) / 0.06);
-  /* Nur transform/opacity animieren; Eintritt aus scale(0.95) – nie aus dem Nichts. */
+  /* Animate only transform/opacity; entry from scale(0.95) – never out of nowhere. */
   animation: jarvis-act-chip-in 170ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 .jarvis-act-chip svg { width: 14px; height: 14px; flex: 0 0 auto; }
-/* Läuft gerade: Akzent, dezenter Puls (nur Opazität) als Status-Signal. */
+/* Currently running: accent, subtle pulse (opacity only) as a status signal. */
 .jarvis-act-chip[data-kind="pending"] { color: hsl(var(--accent-100)); background: hsl(var(--accent-100) / 0.12); }
 .jarvis-act-chip[data-kind="pending"] svg { animation: jarvis-act-pulse 1.4s ease-in-out infinite; }
-/* Fertig: neutral, Icon im Akzent als leiser Haken-Hinweis. */
+/* Done: neutral, icon in accent as a quiet checkmark hint. */
 .jarvis-act-chip[data-kind="done"] { color: hsl(var(--text-300)); background: hsl(var(--text-100) / 0.06); }
 .jarvis-act-chip[data-kind="done"] svg { color: hsl(var(--accent-100)); }
-/* Fehler/abgebrochen: Kernrot. */
+/* Error/cancelled: core red. */
 .jarvis-act-chip[data-kind="error"] { color: var(--core-red); background: var(--core-10-red, hsl(0 100% 60% / 0.1)); }
 .jarvis-act-chip[data-kind="error"] svg { color: var(--core-red); }
 @keyframes jarvis-act-chip-in { from { opacity: 0; transform: scale(0.95); } }
 @keyframes jarvis-act-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
-/* Bestätigungsdialog – ruhige Karte, Akzentkante links; erscheint über der Antwort. */
+/* Confirmation dialog – calm card, accent edge on the left; appears above the answer. */
 .jarvis-act-confirm {
   margin: 2px 0 12px;
   padding: 12px 14px;
@@ -1198,14 +1198,14 @@ body.min-h-screen {
   cursor: pointer;
   transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background 140ms ease;
 }
-.jarvis-act-cbtn:active { transform: scale(0.97); } /* Druck-Feedback: fühlt sich reaktiv an */
+.jarvis-act-cbtn:active { transform: scale(0.97); } /* press feedback: feels responsive */
 .jarvis-act-cbtn.is-yes { background: hsl(var(--accent-100)); color: #fff; }
 .jarvis-act-cbtn.is-yes:hover { background: hsl(var(--accent-100) / 0.88); }
 .jarvis-act-cbtn.is-no { background: hsl(var(--text-100) / 0.08); color: hsl(var(--text-300)); }
 .jarvis-act-cbtn.is-no:hover { background: hsl(var(--text-100) / 0.14); color: hsl(var(--text-100)); }
 @keyframes jarvis-act-confirm-in { from { opacity: 0; transform: translateY(-3px) scale(0.985); } }
 
-/* Reduced-Motion: Bewegung raus, Opazität/Farbe bleibt (verständnisfördernd). */
+/* Reduced motion: remove motion, keep opacity/color (aids comprehension). */
 @media (prefers-reduced-motion: reduce) {
   .jarvis-act-chip,
   .jarvis-act-confirm { animation: none; }
@@ -1214,10 +1214,10 @@ body.min-h-screen {
   .jarvis-act-cbtn:active { transform: none; }
 }
 
-/* ---------- Begrüßungs-Header: beim Chat-Start ausblenden (Animation via Web Animations API in app.js) ---------- */
+/* ---------- Greeting header: hide it on chat start (animation via Web Animations API in app.js) ---------- */
 header.jv-welcome { overflow: hidden; }
 
-/* ================= Sidebar: Chat-Verlauf ("Recently used"), Collapse, Suche ================= */
+/* ================= Sidebar: chat history ("Recently used"), collapse, search ================= */
 .jv-recents-sect { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
 .jv-recents-head {
   display: flex; align-items: center; gap: 6px;
@@ -1256,7 +1256,7 @@ header.jv-welcome { overflow: hidden; }
 .jv-recents-row:hover .jv-recents-del, .jv-recents-del:focus-visible { opacity: 1; }
 .jv-recents-del:hover { color: var(--core-red, #ff5c52); background: hsl(var(--text-100) / 0.08); }
 
-/* Collapse: Sidebar ausblenden (Breite -> 0, entfernt auch den Content-Versatz), Content rückt nach. */
+/* Collapse: hide the sidebar (width -> 0, also removes the content offset), content shifts over. */
 .dframe-sidebar { transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1), transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
 .dframe-content-inner { transition: padding-left 220ms cubic-bezier(0.23, 1, 0.32, 1); }
 html.jv-sidebar-collapsed { --df-sidebar-width: 0px; }
@@ -1275,7 +1275,7 @@ html.jv-sidebar-collapsed .dframe-sidebar { opacity: 0; transform: translateX(-1
 html.jv-sidebar-collapsed .jv-sidebar-expand { display: inline-flex; animation: jv-expand-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 @keyframes jv-expand-in { from { opacity: 0; transform: translateX(-8px) scale(0.96); } to { opacity: 1; transform: none; } }
 
-/* Chat-Suche (Overlay reuse jv-an-* Basis) */
+/* Chat search (overlay reuses jv-an-* base) */
 .jv-search-input { width: 100%; margin-bottom: 10px; }
 .jv-search-results { display: flex; flex-direction: column; gap: 2px; max-height: min(52vh, 440px); overflow-y: auto; }
 .jv-search-empty { padding: 14px 4px; font-size: 13px; color: hsl(var(--text-500)); text-align: center; }
@@ -1293,7 +1293,7 @@ html.jv-sidebar-collapsed .jv-sidebar-expand { display: inline-flex; animation: 
   .jv-sidebar-expand:active { transform: none; }
 }
 
-/* ================= Erweitertes Markdown in Antworten (Tabellen, Task-Lists, Bilder, hr) ========= */
+/* ================= Extended markdown in answers (tables, task lists, images, hr) ========= */
 .epitaxy-markdown .jv-md-table {
   border-collapse: collapse;
   width: auto;

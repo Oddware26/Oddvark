@@ -1,124 +1,124 @@
 @echo off
 setlocal EnableExtensions
-title Oddvark - ALLES starten
+title Oddvark - start EVERYTHING
 cd /d "%~dp0"
 
 echo(
 echo ==================================================
-echo    O D D V A R K   -   startet alle Dienste
+echo    O D D V A R K   -   starting all services
 echo ==================================================
 echo(
-echo  Dienste:  Ollama 11434 . TTS 7862 . Z-Image 7861 . Suche 7863 . STT 7865 . Aktionen 7864 . Web 8000
-echo  Plattformuebergreifend geht auch:  python start.py
-echo  Jeder Dienst laeuft in einem EIGENEN Fenster.
-echo  Nicht gewuenschtes einfach unten mit REM auskommentieren.
+echo  Services:  Ollama 11434 . TTS 7862 . Z-Image 7861 . Search 7863 . STT 7865 . Actions 7864 . Web 8000
+echo  Cross-platform also works:  python start.py
+echo  Each service runs in its OWN window.
+echo  Simply comment out anything you don't want below with REM.
 echo(
 
 REM =====================================================================
-REM  1) Ollama  (LLM-Backend, http://localhost:11434)
+REM  1) Ollama  (LLM backend, http://localhost:11434)
 REM =====================================================================
 curl -s -o nul --max-time 2 http://127.0.0.1:11434/api/version
 if errorlevel 1 (
-  echo [1/6] Ollama wird gestartet ...
+  echo [1/6] Starting Ollama ...
   start "Oddvark - Ollama" ollama serve
 ) else (
-  echo [1/6] Ollama laeuft bereits.
+  echo [1/6] Ollama is already running.
 )
 
 REM =====================================================================
-REM  2) TTS / XTTS-v2  (hyperrealistische Stimmen, http://localhost:7862)
-REM     Erster Start laedt das Modell (~1.8 GB) - dauert etwas.
+REM  2) TTS / XTTS-v2  (hyper-realistic voices, http://localhost:7862)
+REM     First start downloads the model (~1.8 GB) - takes a while.
 REM =====================================================================
 curl -s -o nul --max-time 2 http://127.0.0.1:7862/health
 if errorlevel 1 (
   if exist "%~dp0tools\tts-venv\Scripts\python.exe" (
-    echo [2/6] TTS-Server wird gestartet ... erster Start laedt das Modell
+    echo [2/6] Starting TTS server ... first start downloads the model
     start "Oddvark - TTS (XTTS)" "%~dp0tools\start-tts.bat"
   ) else (
-    echo [2/6] TTS uebersprungen ^(tools\tts-venv fehlt^).
+    echo [2/6] TTS skipped ^(tools\tts-venv missing^).
   )
 ) else (
-  echo [2/6] TTS-Server laeuft bereits.
+  echo [2/6] TTS server is already running.
 )
 
 REM =====================================================================
-REM  3) Z-Image  (Bildgenerierung, http://localhost:7861)
+REM  3) Z-Image  (image generation, http://localhost:7861)
 REM =====================================================================
 curl -s -o nul --max-time 2 http://127.0.0.1:7861/health
 if errorlevel 1 (
   if exist "%~dp0tools\zimage-venv\Scripts\python.exe" (
-    echo [3/6] Z-Image-Server wird gestartet ... erster Start laedt das Modell
+    echo [3/6] Starting Z-Image server ... first start downloads the model
     start "Oddvark - Z-Image" "%~dp0tools\start-zimage.bat"
   ) else (
-    echo [3/6] Z-Image uebersprungen ^(tools\zimage-venv fehlt^).
+    echo [3/6] Z-Image skipped ^(tools\zimage-venv missing^).
   )
 ) else (
-  echo [3/6] Z-Image-Server laeuft bereits.
+  echo [3/6] Z-Image server is already running.
 )
 
 REM =====================================================================
-REM  4) Websuche  (lokale DuckDuckGo-Suche fuer /web + web_search-Tool, Port 7863)
+REM  4) Web search  (local DuckDuckGo search for /web + web_search tool, port 7863)
 REM =====================================================================
 curl -s -o nul --max-time 2 http://127.0.0.1:7863/health
 if errorlevel 1 (
-  echo [4/6] Websuche-Server wird gestartet auf http://127.0.0.1:7863 ...
-  start "Oddvark - Websuche" cmd /k python "%~dp0tools\search-server.py"
+  echo [4/6] Starting web search server on http://127.0.0.1:7863 ...
+  start "Oddvark - Web search" cmd /k python "%~dp0tools\search-server.py"
 ) else (
-  echo [4/6] Websuche-Server laeuft bereits.
+  echo [4/6] Web search server is already running.
 )
 
 REM =====================================================================
-REM  Whisper-STT  (lokale Offline-Spracherkennung, Port 7865; braucht faster-whisper)
+REM  Whisper STT  (local offline speech recognition, port 7865; needs faster-whisper)
 REM =====================================================================
 curl -s -o nul --max-time 2 http://127.0.0.1:7865/health
 if errorlevel 1 (
-  echo [STT] Whisper-Server wird gestartet auf http://127.0.0.1:7865 ...
+  echo [STT] Starting Whisper server on http://127.0.0.1:7865 ...
   start "Oddvark - STT" cmd /k python "%~dp0tools\stt-server.py"
 ) else (
-  echo [STT] Whisper-Server laeuft bereits.
+  echo [STT] Whisper server is already running.
 )
 
 REM =====================================================================
-REM  5) Aktionen  (PC-/Datei-/Browser-/Vision-Zugriff fuer den Chat, Port 7864)
-REM     Voller Zugriff mit Bestaetigung bei riskanten Aktionen. Nur 127.0.0.1.
+REM  5) Actions  (PC/file/browser/vision access for the chat, port 7864)
+REM     Full access with confirmation for risky actions. Only 127.0.0.1.
 REM =====================================================================
 curl -s -o nul --max-time 2 http://127.0.0.1:7864/health
 if errorlevel 1 (
-  echo [5/6] Aktions-Server wird gestartet auf http://127.0.0.1:7864 ...
-  start "Oddvark - Aktionen" cmd /k python "%~dp0tools\action-server.py"
+  echo [5/6] Starting actions server on http://127.0.0.1:7864 ...
+  start "Oddvark - Actions" cmd /k python "%~dp0tools\action-server.py"
 ) else (
-  echo [5/6] Aktions-Server laeuft bereits.
+  echo [5/6] Actions server is already running.
 )
 
 REM =====================================================================
-REM  6) Web-Server (Frontend) + Browser  (http://localhost:8000)
-REM     Ueber localhost statt file:// merkt sich Chrome die Mikro-Erlaubnis.
+REM  6) Web server (frontend) + browser  (http://localhost:8000)
+REM     Via localhost instead of file:// Chrome remembers the mic permission.
 REM =====================================================================
 curl -s -o nul --max-time 2 http://127.0.0.1:8000/index.html
 if errorlevel 1 (
-  echo [6/6] Web-Server wird gestartet auf http://localhost:8000 ^(No-Cache^) ...
+  echo [6/6] Starting web server on http://localhost:8000 ^(No-Cache^) ...
   start "Oddvark - Web" /d "%~dp0" cmd /k python "%~dp0tools\serve.py"
 ) else (
-  echo [6/6] Web-Server laeuft bereits.
+  echo [6/6] Web server is already running.
 )
 
 REM =====================================================================
-REM  Erst auf Bereitschaft warten, DANN Browser oeffnen (sonst laedt die
-REM  Seite bevor Ollama antwortet -> "Failed to fetch" / Connection refused).
+REM  Wait for readiness FIRST, THEN open the browser (otherwise the page
+REM  loads before Ollama responds -> "Failed to fetch" / Connection refused).
 REM =====================================================================
 echo(
-echo  Warte auf Ollama (max. ~60s, erster Start dauert) ...
+echo  Waiting for Ollama (max. ~60s, first start takes a while) ...
 set /a _o=0
 :waitollama
 curl -s -o nul --max-time 2 http://127.0.0.1:11434/api/version
 if not errorlevel 1 goto ollama_ok
 set /a _o+=1
-if %_o% geq 30 ( echo  Ollama antwortet noch nicht - oeffne trotzdem ^(spaeter Seite neu laden^). & goto ollama_ok )
+if %_o% geq 30 ( echo  Ollama isn't responding yet - opening anyway ^(reload the page later^). & goto ollama_ok )
 timeout /t 2 >nul
 goto waitollama
 :ollama_ok
 
-echo  Warte auf Web-Server ...
+echo  Waiting for web server ...
 set /a _w=0
 :waitweb
 curl -s -o nul --max-time 2 http://127.0.0.1:8000/index.html
@@ -129,14 +129,14 @@ timeout /t 1 >nul
 goto waitweb
 :web_ok
 
-echo  Alles bereit - oeffne Oddvark im Browser ...
+echo  All set - opening Oddvark in the browser ...
 start "" http://localhost:8000/index.html
 
 echo(
 echo ==================================================
-echo  Fertig. Alle Dienste laufen in eigenen Fenstern.
-echo  Beenden: die jeweiligen Fenster schliessen.
+echo  Done. All services run in their own windows.
+echo  To stop: close the respective windows.
 echo ==================================================
 echo(
-echo  Dieses Fenster kann geschlossen werden.
+echo  This window can be closed.
 pause >nul

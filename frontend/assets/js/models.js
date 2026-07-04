@@ -1,19 +1,19 @@
-/* Oddvark – Modell-Bibliothek. Durchsuchen/Filtern/Herunterladen von Ollama-Modellen.
-   Katalog kommt aus window.MODELS_CATALOG (per <script src> eingebunden, kein fetch).
-   Installierte Modelle werden live via OLLAMA/api/tags ermittelt.
-   Downloads laufen über OLLAMA/api/pull (NDJSON-Streaming) – exakt wie in jarvis.js. */
+/* Oddvark – model library. Browse/filter/download Ollama models.
+   The catalog comes from window.MODELS_CATALOG (included via <script src>, no fetch).
+   Installed models are detected live via OLLAMA/api/tags.
+   Downloads run through OLLAMA/api/pull (NDJSON streaming) – exactly like in jarvis.js. */
 (function () {
   "use strict";
 
-  // WICHTIG: bewusst 127.0.0.1 statt localhost. Chrome erlaubt nur 6 gleichzeitige
-  // HTTP/1.1-Verbindungen PRO HOSTNAME, geteilt über ALLE Tabs. Laufende Downloads/
-  // Benchmarks dieser Seite würden sonst den Chat-Tab (app.js nutzt localhost:11434)
-  // aussperren – dessen connect() hinge dann endlos in "Connecting …".
-  // 127.0.0.1 und localhost bekommen getrennte Verbindungs-Pools -> keine Konkurrenz.
+  // IMPORTANT: deliberately 127.0.0.1 instead of localhost. Chrome allows only 6 concurrent
+  // HTTP/1.1 connections PER HOSTNAME, shared across ALL tabs. Ongoing downloads/
+  // benchmarks on this page would otherwise lock out the chat tab (app.js uses localhost:11434)
+  // – its connect() would then hang forever in "Connecting …".
+  // 127.0.0.1 and localhost get separate connection pools -> no contention.
   const OLLAMA = "http://127.0.0.1:11434";
 
-  // --- i18n (self-contained; kein window.JV_I18N) ------------------------------
-  // Sprache EINMALIG beim Start lesen (kein Live-Umschalter auf dieser Seite).
+  // --- i18n (self-contained; no window.JV_I18N) --------------------------------
+  // Read the language ONCE at startup (no live toggle on this page).
   const _lng = (function () {
     try { return localStorage.getItem("jarvis.lang") === "de" ? "de" : "en"; }
     catch (e) { return "en"; }
@@ -156,19 +156,19 @@
     });
   }
 
-  // --- Katalog robust einlesen -------------------------------------------------
+  // --- Read the catalog robustly -----------------------------------------------
   const CATALOG = (window.MODELS_CATALOG && Array.isArray(window.MODELS_CATALOG.models))
     ? window.MODELS_CATALOG.models
     : [];
 
-  // Die eigentliche „gesamte Bibliothek" (~zehntausende Modelle) sind die GGUF-Repos auf
-  // HuggingFace – Ollama führt jedes direkt via `ollama run hf.co/<repo>` aus. Der lokale
-  // Proxy paginiert sie cursorbasiert und liefert sie als kompaktes JSON. Nichts wird
-  // gebündelt: der gebündelte Katalog erscheint sofort/offline, der Rest streamt beim Scrollen.
+  // The actual "entire library" (~tens of thousands of models) are the GGUF repos on
+  // HuggingFace – Ollama runs each one directly via `ollama run hf.co/<repo>`. The local
+  // proxy paginates them cursor-based and delivers them as compact JSON. Nothing is
+  // bundled: the bundled catalog appears immediately/offline, the rest streams on scroll.
   const LIBRARY = "http://127.0.0.1:7863/hf_library";
   const catalogNames = new Set(CATALOG.map(function (m) { return m.name; }));
-  const remoteByName = new Map();   // lazy geladene Library-Modelle: name -> model (für Karten-Lookups)
-  const shownNames = new Set();     // bereits gerenderte Namen (Dedup bundled + remote)
+  const remoteByName = new Map();   // lazily loaded library models: name -> model (for card lookups)
+  const shownNames = new Set();     // names already rendered (dedup bundled + remote)
   const lib = { cursor: "", done: false, loading: false, io: null, token: 0, pages: 0 };
   let renderIndex = 0;
   function findModel(name) { return CATALOG.find(function (m) { return m.name === name; }) || remoteByName.get(name) || null; }
@@ -176,40 +176,40 @@
   const root = document.getElementById("models-app");
   if (!root) return;
 
-  // --- Zustand -----------------------------------------------------------------
+  // --- State -------------------------------------------------------------------
   const state = {
-    query: "",                 // Suchtext (lowercase)
-    caps: new Set(),           // aktive Fähigkeits-Filter (tools/vision/embedding/thinking)
-    installedOnly: false,      // Chip "Installiert"
+    query: "",                 // search text (lowercase)
+    caps: new Set(),           // active capability filters (tools/vision/embedding/thinking)
+    installedOnly: false,      // "Installed" chip
     sort: "pulls",             // pulls | name | updated
-    ollamaOk: false,           // ist Ollama erreichbar?
-    installedNames: new Set(), // Basisnamen vor ":" (z. B. "llama3.2")
-    installedTags: new Set(),  // volle Tags (z. B. "llama3.2:1b")
+    ollamaOk: false,           // is Ollama reachable?
+    installedNames: new Set(), // base names before ":" (e.g. "llama3.2")
+    installedTags: new Set(),  // full tags (e.g. "llama3.2:1b")
   };
 
-  // Verfügbare Fähigkeiten als Filter-Chips (feste, sinnvolle Auswahl)
+  // Available capabilities as filter chips (fixed, sensible selection)
   const CAP_FILTERS = ["tools", "vision", "embedding", "thinking"];
 
-  // Laufende Pull-Vorgänge, damit derselbe Chip nicht doppelt startet.
-  // Schlüssel: voller Tag "name:size". Wert: true.
+  // Ongoing pull operations, so the same chip doesn't start twice.
+  // Key: full tag "name:size". Value: true.
   const activePulls = new Set();
 
-  // Pro Modell (name) gewählte Größe und aktiver Tab ("ollama" | "jarvis").
-  // Überlebt das Neu-Rendern einer Karte innerhalb desselben Filter-Durchlaufs.
-  // Schlüssel: model.name.
-  const cardSize = new Map(); // name -> size (oder "" wenn das Modell keine festen Größen hat)
+  // Per model (name), the selected size and active tab ("ollama" | "jarvis").
+  // Survives re-rendering a card within the same filter pass.
+  // Key: model.name.
+  const cardSize = new Map(); // name -> size (or "" if the model has no fixed sizes)
   const cardTab = new Map();  // name -> "ollama" | "jarvis"
 
-  // --- kleine SVG-Icon-Helfer (kein Emoji) ------------------------------------
+  // --- small SVG icon helper (no emoji) ---------------------------------------
   function icon(name) {
-    // HugeIcons Free (MIT) via window.HI (assets/js/hugeicons.js); 'users' entfiel (ungenutzt).
+    // HugeIcons Free (MIT) via window.HI (assets/js/hugeicons.js); 'users' was dropped (unused).
     const MAP = { back: "back", search: "search", download: "download", check: "check", down: "downSmall", clock: "clock", info: "info", empty: "searchEmpty", copy: "copy", terminal: "terminal", spark: "sparkle" };
     return HI(MAP[name] || name, { cls: "mdl-ico" });
   }
 
   // --- Parser ------------------------------------------------------------------
 
-  // "116.5M" / "1.2K" / "8,984" -> Zahl (für Sortierung nach Pulls)
+  // "116.5M" / "1.2K" / "8,984" -> number (for sorting by pulls)
   function parsePulls(s) {
     if (!s) return 0;
     const t = String(s).trim().replace(/,/g, "");
@@ -224,7 +224,7 @@
     return n;
   }
 
-  // Parameter-Zahl aus Size-Token: "8b"->8, "1.5b"->1.5, "405b"->405. Sonst null.
+  // Parameter count from a size token: "8b"->8, "1.5b"->1.5, "405b"->405. Otherwise null.
   function parseParams(size) {
     if (!size) return null;
     const m = String(size).match(/([0-9.]+)\s*b/i);
@@ -233,36 +233,36 @@
     return isFinite(n) ? n : null;
   }
 
-  // Schätzung Download/RAM aus Parameter-Zahl (Q4_K_M-Näherung).
-  // Gibt null zurück, wenn keine Zahl parsebar ist (z. B. "8x7b", "e2b").
+  // Estimate download/RAM from the parameter count (Q4_K_M approximation).
+  // Returns null when no number is parseable (e.g. "8x7b", "e2b").
   function estimate(size) {
     const n = parseParams(size);
     if (n === null) return null;
-    const downloadGB = Math.round(n * 0.62 * 10) / 10; // eine Nachkommastelle
+    const downloadGB = Math.round(n * 0.62 * 10) / 10; // one decimal place
     const ramGB = Math.ceil(downloadGB + 1.5);
     return { downloadGB: downloadGB, ramGB: ramGB };
   }
 
-  // Anzeige-Text für Voraussetzungen einer Größe.
+  // Display text for a size's requirements.
   function reqText(size) {
     const e = estimate(size);
     if (!e) return t("sizeUnknown");
     return t("estimate", { dl: e.downloadGB, ram: e.ramGB });
   }
 
-  // --- Installiert-Status -------------------------------------------------------
+  // --- Installed status ---------------------------------------------------------
 
-  // Ein Katalog-Eintrag gilt als installiert, wenn ein Tag existiert,
-  // dessen Teil vor ":" === model.name.
+  // A catalog entry counts as installed when a tag exists
+  // whose part before ":" === model.name.
   function isModelInstalled(model) {
     return state.installedNames.has(model.name);
   }
-  // Eine konkrete Größe gilt als installiert, wenn Tag "name:size" existiert.
+  // A concrete size counts as installed when the tag "name:size" exists.
   function isSizeInstalled(model, size) {
     return state.installedTags.has(model.name + ":" + size);
   }
 
-  // Live laden – Verbindungsfehler robust abfangen (Seite läuft auch ohne Ollama).
+  // Load live – catch connection errors robustly (the page also runs without Ollama).
   async function loadInstalled() {
     state.installedNames.clear();
     state.installedTags.clear();
@@ -280,28 +280,28 @@
       });
       state.ollamaOk = true;
     } catch (err) {
-      // Kein Ollama -> keine Installiert-Markierung, nur Hinweis oben.
+      // No Ollama -> no installed markers, just the notice at the top.
       state.ollamaOk = false;
     }
   }
 
-  // --- Filter + Sortierung -----------------------------------------------------
+  // --- Filter + sorting --------------------------------------------------------
   function filtered() {
     const q = state.query;
     let list = CATALOG.filter(function (m) {
-      // Suche über name + description (case-insensitive)
+      // Search over name + description (case-insensitive)
       if (q) {
         const hay = (m.name + " " + (m.description || "")).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
-      // Fähigkeits-Filter (alle gewählten müssen vorhanden sein)
+      // Capability filter (all selected must be present)
       if (state.caps.size) {
         const caps = m.capabilities || [];
         for (const c of state.caps) {
           if (caps.indexOf(c) < 0) return false;
         }
       }
-      // Nur installierte
+      // Installed only
       if (state.installedOnly && !isModelInstalled(m)) return false;
       return true;
     });
@@ -309,16 +309,16 @@
     if (state.sort === "name") {
       list.sort(function (a, b) { return a.name.localeCompare(b.name); });
     } else if (state.sort === "updated") {
-      // grobe Sortierung "neueste zuerst" über Alters-Schätzung
+      // rough "newest first" sort via age estimate
       list.sort(function (a, b) { return ageScore(a.updated) - ageScore(b.updated); });
     } else {
-      // Standard: Pulls absteigend
+      // Default: pulls descending
       list.sort(function (a, b) { return parsePulls(b.pulls) - parsePulls(a.pulls); });
     }
     return list;
   }
 
-  // Grobes Alter in Tagen aus "1 year ago" / "3 weeks ago" / "21 hours ago".
+  // Rough age in days from "1 year ago" / "3 weeks ago" / "21 hours ago".
   function ageScore(s) {
     if (!s) return 1e9;
     const m = String(s).match(/([0-9.]+)\s*(hour|day|week|month|year)/i);
@@ -331,7 +331,7 @@
 
   // --- Rendering ----------------------------------------------------------------
 
-  // Statische Hülle einmalig aufbauen.
+  // Build the static shell once.
   function buildShell() {
     root.innerHTML =
       '<header class="mdl-header">' +
@@ -362,7 +362,7 @@
       '<section class="mdl-scanpanel" id="mdl-scanpanel" hidden></section>' +
       '<main class="mdl-grid" id="mdl-grid"></main>';
 
-    // Zurück-Button: explizit per JS (Anforderung), Link bleibt als Fallback.
+    // Back button: explicitly via JS (requirement), the link stays as a fallback.
     document.getElementById("mdl-back").addEventListener("click", function (e) {
       e.preventDefault();
       window.location.href = "index.html";
@@ -373,10 +373,10 @@
     search.addEventListener("input", function () {
       state.query = search.value.trim().toLowerCase();
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(renderGrid, 280); // entprellt: nicht bei jedem Tastendruck die Library abfragen
+      searchTimer = setTimeout(renderGrid, 280); // debounced: don't query the library on every keystroke
     });
 
-    // Sortierung: custom Dropdown (kein natives <select> – projektweit nur custom Popups).
+    // Sorting: custom dropdown (no native <select> – project-wide only custom popups).
     (function initSortDropdown() {
       const SORT = [
         { v: "pulls", label: t("sortPopularity") },
@@ -408,7 +408,7 @@
       setLabel();
     })();
 
-    // Chip-Klicks (Fähigkeiten + "Installiert") delegiert.
+    // Chip clicks (capabilities + "Installed") delegated.
     document.getElementById("mdl-chips").addEventListener("click", function (e) {
       const chip = e.target.closest(".mdl-chip");
       if (!chip) return;
@@ -424,7 +424,7 @@
       renderGrid();
     });
 
-    // "PC scannen": Hardware lesen + Empfehlungen zeigen (Panel toggelt).
+    // "Scan my PC": read hardware + show recommendations (panel toggles).
     document.getElementById("mdl-scan").addEventListener("click", runScan);
     wireScanPanel();
   }
@@ -452,29 +452,29 @@
     return html;
   }
 
-  // Aktuell gewählte Größe einer Karte ermitteln (Standard = erste Größe).
-  // Leerer String, wenn das Modell keine festen Größen hat.
+  // Determine a card's currently selected size (default = first size).
+  // Empty string if the model has no fixed sizes.
   function getSelectedSize(model) {
     const list = model.sizes || [];
     if (cardSize.has(model.name)) {
       const s = cardSize.get(model.name);
-      // Falls die gemerkte Größe nicht (mehr) existiert, auf Standard zurückfallen.
+      // If the remembered size no longer exists, fall back to the default.
       if (s === "" || list.indexOf(s) >= 0) return s;
     }
     return list.length ? list[0] : "";
   }
 
-  // Aktiver Tab einer Karte ("ollama" Standard).
+  // A card's active tab ("ollama" default).
   function getTab(model) {
     return cardTab.get(model.name) === "jarvis" ? "jarvis" : "ollama";
   }
 
-  // Voller Tag/Token für die gewählte Größe.  name + (size? ":"+size : "")
+  // Full tag/token for the selected size.  name + (size? ":"+size : "")
   function tokenFor(model, size) {
     return size ? model.name + ":" + size : model.name;
   }
 
-  // Größen-Chips (auswählbar). Installierte Größe bekommt ein Häkchen.
+  // Size chips (selectable). An installed size gets a checkmark.
   function sizeChipsHTML(model) {
     const list = model.sizes || [];
     if (!list.length) return "";
@@ -495,8 +495,8 @@
     return html;
   }
 
-  // Inhalt der Aktions-Box (Tab-abhängig). Wird auch isoliert neu gerendert,
-  // wenn Tab oder Größe wechseln.
+  // Content of the action box (tab-dependent). Also re-rendered in isolation
+  // when the tab or size changes.
   function actionInnerHTML(model) {
     const tab = getTab(model);
     const size = getSelectedSize(model);
@@ -516,7 +516,7 @@
       );
     }
 
-    // Tab "In Oddvark"
+    // "In Oddvark" tab
     const tokenInstalled = size
       ? isSizeInstalled(model, size)
       : isModelInstalled(model);
@@ -537,7 +537,7 @@
     );
   }
 
-  // Lade-/Status-Zeile für die GEWÄHLTE Größe (Download beibehalten).
+  // Loading/status row for the SELECTED size (keeps the download).
   function dlRowHTML(model) {
     const size = getSelectedSize(model);
     const installed = size ? isSizeInstalled(model, size) : isModelInstalled(model);
@@ -547,7 +547,7 @@
       return '<span class="mdl-size-installed mdl-dl-row-state">' + icon("check") + t("installed") + "</span>";
     }
     if (!size && !(model.sizes || []).length) {
-      // Modell ohne feste Größen -> über den Namen ladbar.
+      // Model without fixed sizes -> downloadable by name.
       return (
         '<button type="button" class="mdl-dl" data-tag="' + escAttr(token) + '" data-state="idle">' +
           '<span class="mdl-dl-fill"></span>' + icon("download") +
@@ -563,8 +563,8 @@
     );
   }
 
-  // Komplette Aktions-Sektion (Tabs + Box + Lade-Zeile). Als eigener Block,
-  // damit Tab-/Größenwechsel nur diesen Teil neu rendern.
+  // Complete action section (tabs + box + loading row). Its own block,
+  // so tab/size changes only re-render this part.
   function actionSectionHTML(model) {
     const tab = getTab(model);
     return (
@@ -582,11 +582,11 @@
     );
   }
 
-  // Eine Karte als HTML-String. data-name am Wurzelelement für spätere Zugriffe.
+  // A card as an HTML string. data-name on the root element for later access.
   function cardHTML(model, index) {
     const installed = isModelInstalled(model);
 
-    // Fähigkeits-Badges + Größen-Chips
+    // Capability badges + size chips
     let badges = "";
     if (model.source === "huggingface") {
       badges += '<span class="mdl-badge mdl-badge-hf">Hugging Face</span>';
@@ -623,8 +623,8 @@
     );
   }
 
-  // Aktions-Sektion einer Karte isoliert neu zeichnen (nach Tab-/Größenwechsel
-  // oder nach erfolgreichem Download). Verändert nur Tabs/Box/Lade-Zeile.
+  // Redraw a card's action section in isolation (after tab/size change
+  // or after a successful download). Only changes tabs/box/loading row.
   function rerenderAction(card) {
     if (!card) return;
     const name = card.getAttribute("data-name");
@@ -634,7 +634,7 @@
     const action = card.querySelector(".mdl-action");
     if (action) action.outerHTML = actionSectionHTML(model);
 
-    // Größen-Chips spiegeln den aktuellen Auswahl-/Installiert-Status.
+    // Size chips reflect the current selection/installed status.
     const chipsWrap = card.querySelector(".mdl-chips-sizes");
     if (chipsWrap) chipsWrap.outerHTML = sizeChipsHTML(model);
   }
@@ -649,8 +649,8 @@
     if (!el) return;
     el.textContent = t(lib.done ? "countDone" : "countLive", { n: shownNames.size });
   }
-  // Karten-HTML für einen Batch: Dedup (bundled+remote) + aktive Fähigkeits-/Installiert-Filter,
-  // Remote-Modelle für spätere Karten-Lookups registrieren.
+  // Card HTML for a batch: dedup (bundled+remote) + active capability/installed filters,
+  // register remote models for later card lookups.
   function cardBatchHTML(models) {
     let html = "";
     models.forEach(function (m) {
@@ -674,7 +674,7 @@
     if (notice) notice.hidden = state.ollamaOk;
 
     const html = cardBatchHTML(filtered());
-    // Die volle Library nur streamen, wenn NICHT "nur installiert" (das ist eine rein lokale Ansicht).
+    // Only stream the full library when NOT "installed only" (that is a purely local view).
     const stream = !state.installedOnly;
     grid.innerHTML = html + (stream
       ? '<div id="mdl-sentinel" class="mdl-sentinel" aria-hidden="true"></div>' +
@@ -692,8 +692,8 @@
       grid.innerHTML = emptyStateHTML();
     }
   }
-  // Nächste Library-Seite vom lokalen Proxy holen und vor dem Sentinel anhängen (Infinite-Scroll).
-  // HF paginiert cursorbasiert: der Proxy liefert `next` (opaker Cursor), den wir zurückreichen.
+  // Fetch the next library page from the local proxy and append it before the sentinel (infinite scroll).
+  // HF paginates cursor-based: the proxy returns `next` (an opaque cursor) that we pass back.
   async function loadMoreLib() {
     if (lib.loading || lib.done) return;
     lib.loading = true;
@@ -707,7 +707,7 @@
       const r = await fetch(url);
       if (r.ok) data = await r.json();
     } catch (e) {}
-    if (token !== lib.token) return;   // Query/Filter hat sich geändert -> Ergebnis verwerfen
+    if (token !== lib.token) return;   // query/filter has changed -> discard the result
     lib.loading = false;
     const moreEl = document.getElementById("mdl-more");
     if (moreEl) moreEl.classList.remove("is-loading");
@@ -715,13 +715,13 @@
     else {
       lib.pages++;
       lib.cursor = data.next || "";
-      // Kein weiterer Cursor -> letzte Seite. Sicherheitsnetz gegen Endlos-Loop bei „nur Duplikate".
+      // No further cursor -> last page. Safety net against an infinite loop on "only duplicates".
       if (!lib.cursor || lib.pages >= 600) lib.done = true;
       const batch = cardBatchHTML(data.models);
       const sentinel = document.getElementById("mdl-sentinel");
       if (batch && sentinel) sentinel.insertAdjacentHTML("beforebegin", batch);
       updateCount();
-      // Sentinel neu beobachten -> falls er weiterhin sichtbar ist (kurze Seite), lädt die nächste Seite von selbst.
+      // Re-observe the sentinel -> if it's still visible (short page), the next page loads by itself.
       if (!lib.done && lib.io && sentinel) { lib.io.unobserve(sentinel); lib.io.observe(sentinel); }
     }
     if (lib.done) {
@@ -735,14 +735,14 @@
   }
   function grid0() { return document.getElementById("mdl-grid") || document.createElement("div"); }
 
-  // --- Download (echt) ----------------------------------------------------------
-  // POST OLLAMA/api/pull, NDJSON streamen – genau wie pullModel() in jarvis.js.
-  // Aktualisiert exakt den Chip mit passendem data-tag (mehrere parallel möglich).
-  // Max. 4 gleichzeitige Pull-Streams: lässt im 6er-Verbindungsbudget des Browsers
-  // Luft für /api/tags & Benchmark und hält die Bandbreite pro Download brauchbar.
+  // --- Download (real) ----------------------------------------------------------
+  // POST OLLAMA/api/pull, stream NDJSON – exactly like pullModel() in jarvis.js.
+  // Updates exactly the chip with the matching data-tag (several possible in parallel).
+  // Max 4 concurrent pull streams: leaves room in the browser's 6-connection budget
+  // for /api/tags & benchmark and keeps the bandwidth per download usable.
   const PULL_MAX = 4;
   let runningPulls = 0;
-  const pullQueue = []; // Resolver wartender Downloads (FIFO)
+  const pullQueue = []; // resolvers of waiting downloads (FIFO)
 
   async function startPull(tag, btn) {
     if (activePulls.has(tag)) return;
@@ -786,7 +786,7 @@
           try { o = JSON.parse(line); } catch (e) { continue; }
           if (o.error) throw new Error(o.error);
           if (o.status) {
-            // Prozent aus completed/total, sonst Status-Text.
+            // Percent from completed/total, otherwise status text.
             if (o.completed && o.total) {
               const pct = Math.round((o.completed / o.total) * 100);
               setProgress(fill, label, pct, pct + "%");
@@ -798,7 +798,7 @@
         }
       }
 
-      // Erfolg -> Größe als installiert markieren.
+      // Success -> mark the size as installed.
       state.installedTags.add(tag);
       state.installedNames.add(tag.split(":")[0]);
       markInstalled(btn, tag);
@@ -807,7 +807,7 @@
       if (fill) fill.style.width = "0%";
       if (label) label.textContent = t("error");
       btn.title = t("dlFailed", { msg: (err && err.message ? err.message : err) });
-      // Nach kurzer Zeit wieder klickbar machen (erneuter Versuch möglich).
+      // Make it clickable again after a short while (a retry is possible).
       setTimeout(function () {
         if (btn.dataset.state === "error") {
           btn.dataset.state = "idle";
@@ -819,17 +819,17 @@
       activePulls.delete(tag);
       runningPulls--;
       const next = pullQueue.shift();
-      if (next) next(); // nächsten wartenden Download starten
+      if (next) next(); // start the next waiting download
     }
   }
 
-  // Statusanzeige am Größen-Button setzen.
+  // Set the status display on the size button.
   function setProgress(fill, label, pct, text) {
     if (fill) fill.style.width = (pct === null ? 8 : pct) + "%";
     if (label) label.textContent = text;
   }
 
-  // Ollama-Status-Texte etwas kürzen/eindeutschen.
+  // Shorten/localize Ollama status texts a bit.
   function shortStatus(s) {
     if (!s) return "…";
     if (/pulling manifest/i.test(s)) return t("stManifest");
@@ -840,20 +840,20 @@
     return s.length > 14 ? s.slice(0, 13) + "…" : s;
   }
 
-  // Nach erfolgreichem Pull: Karte aktualisieren (Größen-Chips, Aktions-Box,
-  // Lade-Zeile) und das Kopf-Badge "Installiert" ergänzen.
+  // After a successful pull: update the card (size chips, action box,
+  // loading row) and add the "Installed" header badge.
   function markInstalled(btn, tag) {
     const card = btn.closest(".mdl-card");
     if (card) {
       rerenderAction(card);
-      // Kopf-Badge "Installiert" ergänzen (falls noch nicht vorhanden).
+      // Add the "Installed" header badge (if not already present).
       if (!card.querySelector(".mdl-badge.is-installed")) {
         const badges = card.querySelector(".mdl-badges");
         if (badges) {
           const b = document.createElement("span");
           b.className = "mdl-badge is-installed";
           b.innerHTML = icon("check") + t("installed");
-          // Vor die Größen-Chips einfügen, damit Badges/Chips getrennt bleiben.
+          // Insert before the size chips so badges/chips stay separated.
           const firstChip = badges.querySelector(".mdl-chips-sizes");
           if (firstChip) badges.insertBefore(b, firstChip);
           else badges.appendChild(b);
@@ -862,7 +862,7 @@
     }
   }
 
-  // --- HTML-Escaping (Katalog ist statisch, aber sauber bleibt sauber) ----------
+  // --- HTML escaping (the catalog is static, but clean stays clean) -------------
   function escHtml(s) {
     return String(s)
       .replace(/&/g, "&amp;")
@@ -873,15 +873,15 @@
     return escHtml(s).replace(/"/g, "&quot;");
   }
 
-  // --- "PC scannen": Hardware-Scan + Empfehlungen + optionaler Tiefen-Benchmark --
-  // Sofort: /hardware (Aktions-Server 7864) liefert CPU/RAM/GPU/VRAM -> Fit-Check gegen
-  // estimate() je Katalog-Modell/Größe. Optional: Benchmark misst echte tokens/s der
-  // INSTALLIERTEN Modelle über Ollama /api/generate und kalibriert damit die Schätzwerte.
+  // --- "Scan my PC": hardware scan + recommendations + optional deep benchmark ---
+  // Immediately: /hardware (action server 7864) returns CPU/RAM/GPU/VRAM -> fit check against
+  // estimate() per catalog model/size. Optionally: the benchmark measures real tokens/s of the
+  // INSTALLED models via Ollama /api/generate and uses that to calibrate the estimates.
   const HARDWARE = "http://127.0.0.1:7864/hardware";
   const scan = { hw: null, loading: false };
   const bench = { running: false, cancel: false, ctrl: null, results: [] }; // {tag, params, tps}
 
-  // Passt eine Größe in VRAM (schnell), in RAM (CPU/teil-offloaded) oder gar nicht?
+  // Does a size fit in VRAM (fast), in RAM (CPU/partially offloaded) or not at all?
   function fitForSize(size, hw) {
     const e = estimate(size);
     if (!e || !hw) return null;
@@ -891,7 +891,7 @@
     if (ram && e.ramGB <= ram * 0.8) return { cls: "ram", label: t("fitRam"), e: e };
     return { cls: "no", label: t("fitNo"), e: e };
   }
-  // Größte Größe, die noch in VRAM passt; sonst größte, die in RAM passt.
+  // Largest size that still fits in VRAM; otherwise the largest that fits in RAM.
   function bestFittingSize(model, hw) {
     const sizes = (model.sizes || []).filter(function (s) { return parseParams(s) !== null; })
       .sort(function (a, b) { return parseParams(b) - parseParams(a); });
@@ -913,7 +913,7 @@
     if (caps.indexOf("thinking") >= 0) return "reasoning";
     return "general";
   }
-  // Top-2 je Kategorie (nach Beliebtheit), jeweils mit der besten passenden Größe.
+  // Top 2 per category (by popularity), each with the best fitting size.
   function buildRecommendations(hw) {
     const byCat = { general: [], coding: [], reasoning: [], vision: [], embedding: [] };
     CATALOG.forEach(function (m) {
@@ -986,7 +986,7 @@
       '<div class="mdl-bench-list" id="mdl-bench-list"></div>'
     );
   }
-  // Skeleton, solange /hardware antwortet (Shimmer; reduced-motion-Variante im CSS).
+  // Skeleton while /hardware responds (shimmer; reduced-motion variant in CSS).
   function scanSkeletonHTML() {
     return (
       '<div class="mdl-scan-head"><h2 class="mdl-scan-title">' + HI("zap", { cls: "mdl-ico" }) + t("scanning") + "</h2></div>" +
@@ -1005,7 +1005,7 @@
   async function runScan() {
     const panel = document.getElementById("mdl-scanpanel");
     if (!panel || scan.loading) return;
-    if (!panel.hidden && scan.hw) { panel.hidden = true; return; } // Toggle
+    if (!panel.hidden && scan.hw) { panel.hidden = true; return; } // toggle
     panel.hidden = false;
     panel.innerHTML = scanSkeletonHTML();
     scan.loading = true;
@@ -1025,7 +1025,7 @@
       scan.loading = false;
     }
   }
-  // Delegierte Klicks im Panel (überlebt jedes Neu-Rendern des Panel-Inhalts).
+  // Delegated clicks in the panel (survives every re-render of the panel content).
   function wireScanPanel() {
     const panel = document.getElementById("mdl-scanpanel");
     if (!panel) return;
@@ -1048,7 +1048,7 @@
         return;
       }
       if (e.target.closest("#mdl-bench-btn")) {
-        if (bench.running) { // läuft -> Klick bricht ab (Button zeigt "Abbrechen")
+        if (bench.running) { // running -> a click cancels (button shows "Cancel")
           bench.cancel = true;
           if (bench.ctrl) { try { bench.ctrl.abort(); } catch (err) {} }
         } else {
@@ -1057,15 +1057,15 @@
       }
     });
   }
-  // Tiefen-Benchmark: misst sequenziell echte tokens/s je INSTALLIERTEM Modell (Ollama
-  // /api/generate non-stream: eval_count/eval_duration) und kalibriert die Empfehlungen
-  // (tps × Parameter ≈ konstant je Maschine -> Schätzwert für nicht installierte Modelle).
+  // Deep benchmark: sequentially measures real tokens/s per INSTALLED model (Ollama
+  // /api/generate non-stream: eval_count/eval_duration) and calibrates the recommendations
+  // (tps × parameters ≈ constant per machine -> estimate for models that aren't installed).
   async function runBenchmark() {
     if (bench.running) return;
     const listEl = document.getElementById("mdl-bench-list");
     const btn = document.getElementById("mdl-bench-btn");
     if (!listEl || !btn) return;
-    if (activePulls.size) { // unter Download-Last messen = falsche tokens/s
+    if (activePulls.size) { // measuring under download load = wrong tokens/s
       listEl.innerHTML = '<div class="mdl-scan-none">' + t("benchWaitPulls") + "</div>";
       return;
     }
@@ -1113,7 +1113,7 @@
     bench.running = false; bench.ctrl = null;
     btn.dataset.bench = "";
     if (btnLabel) btnLabel.textContent = t("benchStart");
-    // Kalibrierung: Median von tps*params -> geschätzte tokens/s je Empfehlung.
+    // Calibration: median of tps*params -> estimated tokens/s per recommendation.
     const cal = bench.results
       .filter(function (r) { return r.tps > 0 && r.params; })
       .map(function (r) { return r.tps * r.params; })
@@ -1133,13 +1133,13 @@
     }
   }
 
-  // Zentrale Klick-Delegation am Grid (überlebt Neu-Rendern des Grids).
-  // Behandelt: Download, Größenauswahl, Tabs, Kopieren, "Als aktives Modell".
+  // Central click delegation on the grid (survives re-rendering of the grid).
+  // Handles: download, size selection, tabs, copy, "Set as active model".
   function wireGridClicks() {
     const grid = document.getElementById("mdl-grid");
 
     grid.addEventListener("click", function (e) {
-      // 1) Größen-Chip auswählen
+      // 1) Select a size chip
       const chip = e.target.closest(".mdl-size-chip");
       if (chip) {
         const card = chip.closest(".mdl-card");
@@ -1147,20 +1147,20 @@
         const size = chip.getAttribute("data-size-chip");
         if (name && size != null) {
           cardSize.set(name, size);
-          // Aktiven Chip umsetzen (nur aria-pressed, ohne Komplett-Neuaufbau)
+          // Toggle the active chip (only aria-pressed, without a full rebuild)
           const group = chip.parentNode;
           if (group) {
             group.querySelectorAll(".mdl-size-chip").forEach(function (c) {
               c.setAttribute("aria-pressed", c === chip ? "true" : "false");
             });
           }
-          // Aktions-Box + Lade-Zeile auf die neue Größe aktualisieren
+          // Update the action box + loading row to the new size
           rerenderAction(card);
         }
         return;
       }
 
-      // 2) Tab wechseln
+      // 2) Switch tab
       const tab = e.target.closest(".mdl-tab");
       if (tab) {
         const card = tab.closest(".mdl-card");
@@ -1173,14 +1173,14 @@
         return;
       }
 
-      // 3) Befehl kopieren
+      // 3) Copy command
       const copyBtn = e.target.closest(".mdl-copy");
       if (copyBtn) {
         copyCommand(copyBtn);
         return;
       }
 
-      // 4) Als aktives Modell setzen (nur wenn installiert -> Button enabled)
+      // 4) Set as active model (only when installed -> button enabled)
       const setBtn = e.target.closest(".mdl-set");
       if (setBtn) {
         if (setBtn.disabled) return;
@@ -1192,10 +1192,10 @@
         return;
       }
 
-      // 5) Download starten
+      // 5) Start download
       const dl = e.target.closest(".mdl-dl");
       if (dl) {
-        if (dl.dataset.state === "busy") return; // läuft bereits
+        if (dl.dataset.state === "busy") return; // already running
         const tag = dl.getAttribute("data-tag");
         if (tag) startPull(tag, dl);
         return;
@@ -1203,7 +1203,7 @@
     });
   }
 
-  // Befehl in die Zwischenablage kopieren + kurzes "Kopiert ✓"-Feedback (2 s).
+  // Copy command to the clipboard + brief "Copied ✓" feedback (2 s).
   function copyCommand(btn) {
     const cmd = btn.getAttribute("data-copy") || "";
     const label = btn.querySelector(".mdl-copy-label");
@@ -1223,7 +1223,7 @@
     }
   }
 
-  // Fallback ohne Clipboard-API (z. B. file:// in älteren Browsern).
+  // Fallback without the Clipboard API (e.g. file:// in older browsers).
   function fallbackCopy(text, done) {
     try {
       const ta = document.createElement("textarea");
@@ -1235,16 +1235,16 @@
       document.execCommand("copy");
       document.body.removeChild(ta);
       done();
-    } catch (err) { /* leise scheitern */ }
+    } catch (err) { /* fail silently */ }
   }
 
   // --- Start -------------------------------------------------------------------
   async function init() {
     buildShell();
     wireGridClicks();
-    renderGrid();          // sofort rendern (auch ohne Ollama)
-    await loadInstalled(); // Installiert-Status live nachladen
-    renderGrid();          // mit Installiert-Markierungen neu rendern
+    renderGrid();          // render immediately (even without Ollama)
+    await loadInstalled(); // load installed status live
+    renderGrid();          // re-render with installed markers
   }
 
   if (document.readyState === "loading") {

@@ -505,7 +505,7 @@
     "act.confirm": "Bestätigen",
     "act.cancel": "Abbrechen",
     "act.error": "Fehler",
-    // Quellen-Pille der Websuche
+    // web-search sources pill
     "src.one": "Quelle",
     "src.many": "Quellen",
     "act.open_website": "Website öffnen",

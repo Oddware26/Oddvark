@@ -1,14 +1,14 @@
 {
-  "_hinweis": "Kopiere diese Datei nach config.json und passe sie an. KEINE echten Secrets committen. Der Aktions-Server (tools/action-server.py) liest frontend/config.json beim Start.",
+  "_hinweis": "Copy this file to config.json and adjust it. Do NOT commit real secrets. The actions server (tools/action-server.py) reads frontend/config.json at startup.",
 
   "app_whitelist": {
-    "Rechner": "calc.exe",
-    "Editor": "notepad.exe",
+    "Calculator": "calc.exe",
+    "Notepad": "notepad.exe",
     "Explorer": "explorer.exe",
     "Browser": "cmd /c start \"\" \"https://www.google.com\""
   },
 
-  "_allowed_domains_hinweis": "Leere Liste = KEINE Domain-Einschraenkung (Standard; nur oeffentliche Hosts, SSRF-Schutz bleibt). Websites OEFFNEN (open_url) ist immer erlaubt. Nur fuellen, wenn server-seitiges Lesen/Automatisieren (browse_page/browser_act) bewusst auf bestimmte Domains beschraenkt werden soll, z. B. [\"*.wikipedia.org\", \"*.github.com\"].",
+  "_allowed_domains_hinweis": "Empty list = NO domain restriction (default; public hosts only, SSRF protection remains). OPENING websites (open_url) is always allowed. Only fill this in if server-side reading/automation (browse_page/browser_act) should deliberately be restricted to specific domains, e.g. [\"*.wikipedia.org\", \"*.github.com\"].",
   "allowed_domains": [],
 
   "smtp": {
@@ -29,10 +29,10 @@
     "send_email"
   ],
 
-  "_vision_hinweis": "Ollama-Modell fuer Bildschirm-Sehen (see_screen). Standard: qwen2.5vl:7b (zieht setup.bat). Mehr VRAM? qwen2.5vl:32b ist deutlich besser.",
+  "_vision_hinweis": "Ollama model for screen vision (see_screen). Default: qwen2.5vl:7b (pulled by setup.bat). More VRAM? qwen2.5vl:32b is significantly better.",
   "vision_model": "qwen2.5vl:7b",
 
-  "_whisper_hinweis": "Lokale Spracherkennung (tools/stt-server.py, faster-whisper). model_size: tiny|base|small|medium|large-v3. device: auto|cpu|cuda (auto = GPU falls verfuegbar). language: null = automatische Erkennung, sonst z. B. \"de\". Modell wird beim ersten Einsatz autom. heruntergeladen.",
+  "_whisper_hinweis": "Local speech recognition (tools/stt-server.py, faster-whisper). model_size: tiny|base|small|medium|large-v3. device: auto|cpu|cuda (auto = GPU if available). language: null = automatic detection, otherwise e.g. \"de\". Model is downloaded automatically on first use.",
   "whisper": {
     "model_size": "base",
     "device": "auto",
@@ -40,9 +40,9 @@
     "language": null
   },
 
-  "_workspace_hinweis": "Arbeitsordner fuer Datei-Erstellung, Projekt-Scaffolding und Ausfuehrung (write_file/read_file/list_workspace/create_project/run_command/run_file/open_path). Relative Pfade sind IMMER relativ zu diesem Ordner (Pfad-Traversal-Schutz; kein Ausbruch via '..'). Absolute Pfade sind erlaubt, gelten aber als sensibel und verlangen eine Bestaetigung. Wird beim Start angelegt, falls nicht vorhanden. Leer/weglassen = ~/OddvarkWorkspace.",
+  "_workspace_hinweis": "Working folder for file creation, project scaffolding and execution (write_file/read_file/list_workspace/create_project/run_command/run_file/open_path). Relative paths are ALWAYS relative to this folder (path-traversal protection; no escape via '..'). Absolute paths are allowed but are considered sensitive and require confirmation. Created at startup if it does not exist. Empty/omitted = ~/OddvarkWorkspace.",
   "workspace_dir": "",
 
-  "_run_timeout_hinweis": "Timeout in Sekunden fuer run_command/run_file.",
+  "_run_timeout_hinweis": "Timeout in seconds for run_command/run_file.",
   "run_timeout_sec": 60
 }

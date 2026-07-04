@@ -1,16 +1,16 @@
-# Oddvark – Python-Abhängigkeiten für Aktions-Server (tools/action-server.py) und Whisper-STT.
-# Wird von setup.bat installiert (bzw. `pip install -r frontend/requirements.txt`).
-# Fehlt ein Paket doch einmal, degradiert das betroffene Feature sauber (siehe GET /capabilities).
+# Oddvark – Python dependencies for the actions server (tools/action-server.py) and Whisper STT.
+# Installed by setup.bat (or `pip install -r frontend/requirements.txt`).
+# If a package is missing after all, the affected feature degrades cleanly (see GET /capabilities).
 
-psutil            # Systeminfo (CPU/RAM/Akku/Disk), Netzwerk
-pillow            # Screenshots + Skalierung (Vision, see_screen)
-mss               # schnellere Screenshots (Alternative zu Pillow ImageGrab)
-pyautogui         # Maus/Tastatur-Steuerung, autonomer Agent-Loop (agent_task)
-pyperclip         # Zwischenablage lesen/schreiben
-pygetwindow       # Fensterliste / Fenster-Management (optional)
+psutil            # System info (CPU/RAM/battery/disk), network
+pillow            # Screenshots + scaling (vision, see_screen)
+mss               # Faster screenshots (alternative to Pillow ImageGrab)
+pyautogui         # Mouse/keyboard control, autonomous agent loop (agent_task)
+pyperclip         # Read/write the clipboard
+pygetwindow       # Window list / window management (optional)
 
-faster-whisper    # lokales STT (Offline-Spracherkennung, tools/stt-server.py)
-                  # Die App sendet WAV – ffmpeg ist NICHT nötig. Modell wird autom. geladen.
+faster-whisper    # Local STT (offline speech recognition, tools/stt-server.py)
+                  # The app sends WAV – ffmpeg is NOT required. Model is loaded automatically.
 
-# TTS (XTTS-v2) und Z-Image laufen in eigenen venvs (tools/tts-venv, tools/zimage-venv);
-# setup.bat legt beide an – Details im README.
+# TTS (XTTS-v2) and Z-Image run in their own venvs (tools/tts-venv, tools/zimage-venv);
+# setup.bat creates both – see the README for details.

@@ -5,44 +5,44 @@ cd /d "%~dp0"
 
 echo(
 echo   ============================================
-echo      O D D V A R K   -   startet ...
+echo      O D D V A R K   -   starting ...
 echo   ============================================
 echo(
 
-REM --- 1) Ollama sicherstellen (das einzige Muss). ---------------------------
+REM --- 1) Ensure Ollama is available (the only hard requirement). -------------
 where ollama >nul 2>nul
 if errorlevel 1 (
-  echo   [!] Ollama ist nicht installiert.
-  echo       Bitte einmalig von https://ollama.com installieren, dann ein Modell laden:
+  echo   [!] Ollama is not installed.
+  echo       Please install it once from https://ollama.com, then pull a model:
   echo           ollama pull llama3.2
   echo(
-  echo   Danach diese Datei erneut starten.
+  echo   After that, start this file again.
   echo(
   pause
   exit /b 1
 )
 curl -s -o nul --max-time 2 http://127.0.0.1:11434/api/version
 if errorlevel 1 (
-  echo   [*] Starte Ollama ...
+  echo   [*] Starting Ollama ...
   start "Ollama" /min ollama serve
 )
 
-REM --- 2) Voll-Modus mit Python (Websuche, PC-Steuerung, Stimmen) ODER --------
-REM        Kern-Modus ohne alles: index.html direkt oeffnen (nur Ollama noetig). --
+REM --- 2) Full mode with Python (web search, PC control, voices) OR -----------
+REM        core mode without extras: open index.html directly (only Ollama needed). --
 where python >nul 2>nul
 if not errorlevel 1 (
-  echo   [*] Python gefunden - starte das volle Erlebnis ^(inkl. Websuche, PC-Steuerung^).
+  echo   [*] Python found - starting the full experience ^(incl. web search, PC control^).
   echo(
   python "%~dp0frontend\start.py"
   goto :eof
 )
 
-echo   [i] Python nicht gefunden - starte Oddvark im Kern-Modus.
-echo       Chat, Modelle, Einstellungen und Verlauf funktionieren voll.
-echo       Fuer Websuche / PC-Steuerung / eigene Stimmen spaeter einmal Python
-echo       ^(https://python.org^) installieren und diese Datei erneut starten.
+echo   [i] Python not found - starting Oddvark in core mode.
+echo       Chat, models, settings and history work fully.
+echo       For web search / PC control / custom voices, install Python
+echo       ^(https://python.org^) once later and start this file again.
 echo(
-echo   Warte kurz auf Ollama ...
+echo   Waiting briefly for Ollama ...
 set /a _o=0
 :waitollama
 curl -s -o nul --max-time 2 http://127.0.0.1:11434/api/version
@@ -55,5 +55,5 @@ goto waitollama
 
 start "" "%~dp0frontend\index.html"
 echo(
-echo   Oddvark wurde im Browser geoeffnet. Dieses Fenster kann geschlossen werden.
+echo   Oddvark has been opened in the browser. This window can be closed.
 timeout /t 4 >nul

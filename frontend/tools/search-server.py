@@ -1,8 +1,8 @@
-# Oddvark - lokale Websuche (DuckDuckGo, ohne API-Key), Port 7863.
-# Nur Python-Standardbibliothek (wie serve.py): kein venv, keine Abhaengigkeiten.
+# Oddvark - local web search (DuckDuckGo, no API key), port 7863.
+# Python standard library only (like serve.py): no venv, no dependencies.
 #   GET /health           -> {"ok": true}
 #   GET /search?q=..&n=8  -> {"results": [{"title","url","snippet"}, ...]}
-# Quellen: html.duckduckgo.com (primaer), lite.duckduckgo.com (Fallback).
+# Sources: html.duckduckgo.com (primary), lite.duckduckgo.com (fallback).
 import json
 import re
 import datetime
@@ -29,7 +29,7 @@ def _fetch(url, data=None, extra_headers=None):
 
 
 def _fetch_resp(url, extra_headers=None):
-    # Wie _fetch, gibt aber zusätzlich den Link-Header zurück (für HF-Cursor-Pagination).
+    # Like _fetch, but additionally returns the Link header (for HF cursor pagination).
     headers = {"User-Agent": UA, "Accept-Language": "en;q=0.9,de;q=0.7"}
     if extra_headers:
         headers.update(extra_headers)
@@ -43,7 +43,7 @@ def _strip(s):
 
 
 def _unwrap(url):
-    # DDG verpackt Ziel-URLs als //duckduckgo.com/l/?uddg=<url-encoded>&rut=...
+    # DDG wraps target URLs as //duckduckgo.com/l/?uddg=<url-encoded>&rut=...
     if url.startswith("//"):
         url = "https:" + url
     m = re.search(r"[?&]uddg=([^&]+)", url)
@@ -78,7 +78,7 @@ def _search_lite(q, n):
     body = _fetch("https://lite.duckduckgo.com/lite/",
                   data=urllib.parse.urlencode({"q": q, "kl": "de-de"}).encode())
     out = []
-    # Lite: Tabellenzeilen mit <a rel="nofollow" href="...">Titel</a>, danach result-snippet-Zelle.
+    # Lite: table rows with <a rel="nofollow" href="...">title</a>, followed by a result-snippet cell.
     rows = re.split(r"<tr", body)
     cur = None
     for row in rows:
@@ -107,16 +107,16 @@ def search(q, n):
     return _search_lite(q, n)
 
 
-# ---- Ollama-Bibliothek (ollama.com/search) paginiert als kompaktes JSON ---------
-# Holt EINE Seite (20 Modelle) der öffentlichen Ollama-Suche und parst die Modell-Karten.
-# So kann die Modelle-Seite die GESAMTE Library lazy beim Scrollen nachladen, ohne alles zu bündeln.
+# ---- Ollama library (ollama.com/search) paginated as compact JSON ---------
+# Fetches ONE page (20 models) of the public Ollama search and parses the model cards.
+# This lets the models page lazily load the ENTIRE library while scrolling, without bundling everything.
 #
-# WICHTIG (durch Reverse-Engineering ermittelt): ollama.com/search paginiert per htmx.
-#   - Seiten-Param ist ?page=N (NICHT ?p=N).
-#   - Ohne den Header "HX-Request: true" liefert Seite >1 einen LEEREN Body.
-#   - Leere Query q="" liefert nur ~236 kuratierte/aktuelle Modelle (≈ gebündelter Katalog);
-#     mit echter Query q durchsucht sie die volle Community-Bibliothek (~10k) und paginiert tief.
-#   - Optional: c=<vision|tools|thinking|embedding|cloud> (Fähigkeit), o=<newest|popular> (Sortierung).
+# IMPORTANT (determined by reverse engineering): ollama.com/search paginates via htmx.
+#   - The page param is ?page=N (NOT ?p=N).
+#   - Without the header "HX-Request: true", page >1 returns an EMPTY body.
+#   - An empty query q="" returns only ~236 curated/recent models (≈ the bundled catalog);
+#     with a real query q it searches the full community library (~10k) and paginates deep.
+#   - Optional: c=<vision|tools|thinking|embedding|cloud> (capability), o=<newest|popular> (sort order).
 def _ollama_library(q, page, cap="", order=""):
     try:
         p = max(1, int(page or 1))
@@ -130,7 +130,7 @@ def _ollama_library(q, page, cap="", order=""):
     url = "https://ollama.com/search?" + urllib.parse.urlencode(params)
     body = _fetch(url, extra_headers={"HX-Request": "true", "HX-Target": "searchresults"})
     out = []
-    # Robust: an den x-test-model-Markern splitten (keine </li>-Abhängigkeit).
+    # Robust: split on the x-test-model markers (no </li> dependency).
     for chunk in re.split(r"x-test-model", body)[1:]:
         nm = re.search(r'href="/library/([^"]+)"', chunk)
         if not nm:
@@ -150,13 +150,13 @@ def _ollama_library(q, page, cap="", order=""):
     return {"models": out, "page": p, "has_more": len(out) >= 20}
 
 
-# ---- HuggingFace-GGUF-Bibliothek (die eigentlichen ~zehntausend Modelle) ---------
-# ollama.com/search liefert nur den kuratierten Satz. Die WIRKLICH große Bibliothek sind
-# die GGUF-Repos auf HuggingFace – Ollama kann jedes davon direkt ausführen:
+# ---- HuggingFace GGUF library (the actual ~ten thousand models) ---------
+# ollama.com/search returns only the curated set. The REALLY large library is
+# the GGUF repos on HuggingFace – Ollama can run any of them directly:
 #     ollama run hf.co/<user>/<repo>
-# Die HF-API ist paginiert (Cursor via Link-Header, unbegrenzt tief) und nach Downloads
-# sortiert, sodass die Modelle-Seite sie lazy beim Scrollen streamen kann – nichts gebündelt.
-# CORS der HF-API ist auf huggingface.co beschränkt -> Zugriff MUSS über diesen Proxy laufen.
+# The HF API is paginated (cursor via Link header, unlimited depth) and sorted by
+# downloads, so the models page can stream it lazily while scrolling – nothing bundled.
+# The HF API's CORS is restricted to huggingface.co -> access MUST go through this proxy.
 _HF_SKIP_TAG = re.compile(
     r"^(i?q\d[\w.]*|f16|bf16|fp16|fp8|\d+-?bit|gguf|quantized|conversational|"
     r"text-generation-inference|autotrain_compatible|endpoints_compatible|"
@@ -198,8 +198,8 @@ def _hf_next_cursor(link):
 
 
 def _hf_ago(iso):
-    # ISO-Zeitstempel -> kompakte relative Angabe im Stil der ollama-Quelle ("3 months"),
-    # die der Client dann als "{v} ago" / "vor {v}" rendert.
+    # ISO timestamp -> compact relative value in the style of the ollama source ("3 months"),
+    # which the client then renders as "{v} ago" / "vor {v}".
     if not iso:
         return ""
     try:
@@ -223,9 +223,9 @@ def _hf_ago(iso):
 
 
 def _hf_library(q, cursor):
-    # Basis-URL ist fest (nur huggingface.co) – der Client steuert lediglich Query + opaken
-    # Cursor-Wert, nie den Host. Damit kein SSRF-Vektor.
-    # expand=... hält die Antwort schlank (nur benötigte Felder) UND liefert lastModified.
+    # Base URL is fixed (only huggingface.co) – the client controls just the query + opaque
+    # cursor value, never the host. So no SSRF vector.
+    # expand=... keeps the response lean (only the needed fields) AND returns lastModified.
     params = [
         ("filter", "gguf"), ("sort", "downloads"), ("direction", "-1"), ("limit", "24"),
         ("expand", "downloads"), ("expand", "lastModified"),
@@ -259,7 +259,7 @@ def _hf_library(q, cursor):
             "label": label,
             "description": desc,
             "capabilities": _hf_caps(tags, ptag),
-            "sizes": [],  # ohne Tag wählt Ollama automatisch eine Quantisierung
+            "sizes": [],  # without a tag, Ollama automatically picks a quantization
             "pulls": _hf_pulls(m.get("downloads")),
             "updated": _hf_ago(m.get("lastModified")),
             "source": "huggingface",
@@ -291,7 +291,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 n = 8
             if not q:
-                self._send(400, {"error": "q fehlt"})
+                self._send(400, {"error": "q missing"})
                 return
             try:
                 self._send(200, {"results": search(q, n)})
@@ -318,12 +318,12 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(502, {"error": str(e)})
             return
-        self._send(404, {"error": "nicht gefunden"})
+        self._send(404, {"error": "not found"})
 
-    def log_message(self, fmt, *args):  # kompaktes Log
-        print("[Suche] " + (fmt % args))
+    def log_message(self, fmt, *args):  # compact log
+        print("[Search] " + (fmt % args))
 
 
 if __name__ == "__main__":
-    print("Oddvark Websuche-Server auf http://127.0.0.1:%d (Beenden: Strg+C)" % PORT)
+    print("Oddvark web search server at http://127.0.0.1:%d (quit: Ctrl+C)" % PORT)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

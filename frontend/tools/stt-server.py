@@ -1,29 +1,28 @@
 """
-Oddvark - lokaler Spracherkennungs-Server (Speech-to-Text) mit faster-whisper.
+Oddvark - local speech recognition server (speech-to-text) with faster-whisper.
 
-Offline, lokal, genau und mehrsprachig - damit Oddvark nicht mehr von der
-Cloud-Web-Speech-API abhaengt. Nimmt Audio (webm/ogg/wav/mp3) entgegen und
-gibt den erkannten Text zurueck. Das Frontend (file:// oder http://localhost)
-ruft die API per fetch auf:
+Offline, local, accurate and multilingual - so Oddvark no longer depends on the
+cloud Web Speech API. Takes audio (webm/ogg/wav/mp3) and returns the recognized
+text. The frontend (file:// or http://localhost) calls the API via fetch:
 
   GET  /health        -> {"ok": true, "available": bool, "model": str|null, "loaded": bool}
   GET  /capabilities  -> {"available": bool, "model_size": str, "device": str, "note": str}
   POST /transcribe    -> {"text": str, "language": str, "duration": float}
-       Eingabe 1: Content-Type: application/json  {"audio_base64": "...", "mime"?, "language"?}
-       Eingabe 2: Content-Type: audio/*  oder  multipart/form-data  (rohe Bytes)
-  POST /warmup        -> {"ok": bool, ...}   (Modell vorab laden)
+       Input 1: Content-Type: application/json  {"audio_base64": "...", "mime"?, "language"?}
+       Input 2: Content-Type: audio/*  or  multipart/form-data  (raw bytes)
+  POST /warmup        -> {"ok": bool, ...}   (preload the model)
 
-faster-whisper ist eine OPTIONALE Abhaengigkeit: fehlt sie, startet der Server
-trotzdem und meldet ueber /health + /capabilities available:false mit klarem
-Installationshinweis. Er stuerzt NIE ab, sondern degradiert sauber.
+faster-whisper is an OPTIONAL dependency: if it is missing, the server still
+starts and reports available:false via /health + /capabilities with a clear
+install hint. It NEVER crashes, but degrades gracefully.
 
 Start:
   tools/start-stt.bat
 
-Voraussetzungen (optional):  pip install faster-whisper
-Fuer webm/ogg wird zusaetzlich ffmpeg im PATH benoetigt (WAV geht auch ohne).
-Das Modell wird von faster-whisper beim ersten /transcribe automatisch
-heruntergeladen und gecacht.
+Requirements (optional):  pip install faster-whisper
+For webm/ogg, ffmpeg is additionally needed in PATH (WAV works without it).
+The model is downloaded and cached automatically by faster-whisper on the
+first /transcribe.
 """
 import os
 import json
@@ -34,7 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
     from faster_whisper import WhisperModel
-except Exception:  # noqa: BLE001 - Lib optional, Server soll trotzdem starten
+except Exception:  # noqa: BLE001 - lib optional, server should start anyway
     WhisperModel = None
 
 HOST = os.environ.get("STT_HOST", "127.0.0.1")
@@ -46,15 +45,15 @@ CONFIG_PATH = os.path.join(_FRONTEND, "config.json")
 
 PIP_HINT = "pip install faster-whisper"
 
-# Defaults (per config.json ueberschreibbar, Key "whisper")
+# Defaults (overridable via config.json, key "whisper")
 DEFAULTS = {
     "model_size": "base",     # tiny | base | small | medium | large-v3 ...
-    "device": "auto",         # auto -> cuda falls verfuegbar sonst cpu
+    "device": "auto",         # auto -> cuda if available, otherwise cpu
     "compute_type": "auto",   # auto | int8 | float16 | float32 ...
-    "language": None,         # None = automatische Spracherkennung
+    "language": None,         # None = automatic language detection
 }
 
-# mime -> Dateiendung fuer die Temp-Datei (faster-whisper liest via ffmpeg)
+# mime -> file extension for the temp file (faster-whisper reads via ffmpeg)
 MIME_EXT = {
     "audio/webm": ".webm", "audio/ogg": ".ogg", "audio/wav": ".wav",
     "audio/x-wav": ".wav", "audio/wave": ".wav", "audio/mpeg": ".mp3",
@@ -62,11 +61,11 @@ MIME_EXT = {
     "audio/flac": ".flac", "audio/webm;codecs=opus": ".webm",
 }
 
-model = None          # geladenes WhisperModel (lazy)
+model = None          # loaded WhisperModel (lazy)
 loaded = False
 device_used = "cpu"
 load_err = None
-gpu_lock = threading.Lock()   # nur EINE Transkription gleichzeitig
+gpu_lock = threading.Lock()   # only ONE transcription at a time
 
 
 def load_config():
@@ -78,11 +77,11 @@ def load_config():
         for k in DEFAULTS:
             if k in w:
                 cfg[k] = w[k]
-        print("[STT] config.json geladen: %s" % CONFIG_PATH)
+        print("[STT] config.json loaded: %s" % CONFIG_PATH)
     except FileNotFoundError:
-        print("[STT] keine config.json - nutze Defaults (siehe config.example.json)")
+        print("[STT] no config.json - using defaults (see config.example.json)")
     except Exception as e:  # noqa: BLE001
-        print("[STT] config.json fehlerhaft (%r) - nutze Defaults" % e)
+        print("[STT] config.json invalid (%r) - using defaults" % e)
     return cfg
 
 
@@ -90,7 +89,7 @@ CONFIG = load_config()
 
 
 def _resolve_device():
-    """'auto' -> 'cuda' falls eine CUDA-GPU verfuegbar ist, sonst 'cpu'."""
+    """'auto' -> 'cuda' if a CUDA GPU is available, otherwise 'cpu'."""
     dev = (CONFIG.get("device") or "auto").lower()
     if dev != "auto":
         return dev
@@ -104,7 +103,7 @@ def _resolve_device():
 
 
 def load_model():
-    """Modell lazy laden (thread-safe). Rueckgabe True bei Erfolg."""
+    """Load the model lazily (thread-safe). Returns True on success."""
     global model, loaded, device_used, load_err
     if loaded:
         return True
@@ -117,16 +116,16 @@ def load_model():
             dev = _resolve_device()
             ct = CONFIG.get("compute_type") or "auto"
             size = CONFIG.get("model_size") or "base"
-            print("[STT] lade Whisper '%s' auf %s (compute=%s) ..." % (size, dev, ct), flush=True)
+            print("[STT] loading Whisper '%s' on %s (compute=%s) ..." % (size, dev, ct), flush=True)
             model = WhisperModel(size, device=dev, compute_type=ct)
             device_used = dev
             loaded = True
             load_err = None
-            print("[STT] bereit.", flush=True)
+            print("[STT] ready.", flush=True)
             return True
         except Exception as e:  # noqa: BLE001
             load_err = repr(e)
-            print("[STT] LADEFEHLER:", e, flush=True)
+            print("[STT] LOAD ERROR:", e, flush=True)
             return False
 
 
@@ -138,9 +137,9 @@ def _ext_for(mime):
 
 
 def transcribe_bytes(audio, mime, language):
-    """Rohe Audio-Bytes -> {text, language, duration}. Wirft bei echtem Fehler."""
+    """Raw audio bytes -> {text, language, duration}. Raises on a real error."""
     if not load_model():
-        raise RuntimeError(load_err or "Modell nicht geladen")
+        raise RuntimeError(load_err or "model not loaded")
     lang = language or CONFIG.get("language") or None
     fd, path = tempfile.mkstemp(suffix=_ext_for(mime))
     with os.fdopen(fd, "wb") as f:
@@ -192,8 +191,8 @@ class Handler(BaseHTTPRequestHandler):
             })
         elif self.path.startswith("/capabilities"):
             avail = WhisperModel is not None
-            note = ("bereit" if avail else
-                    "faster-whisper nicht installiert - " + PIP_HINT)
+            note = ("ready" if avail else
+                    "faster-whisper not installed - " + PIP_HINT)
             self._send(200, {
                 "available": avail,
                 "model_size": CONFIG.get("model_size"),
@@ -204,8 +203,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def _read_audio(self):
-        """Liest Audio-Bytes + mime + language aus dem Request.
-        Rueckgabe (audio_bytes|None, mime, language)."""
+        """Reads audio bytes + mime + language from the request.
+        Returns (audio_bytes|None, mime, language)."""
         n = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(n) if n else b""
         ctype = (self.headers.get("Content-Type") or "").lower()
@@ -216,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
                 b64 = b64.split(",", 1)[1]
             audio = base64.b64decode(b64) if b64 else b""
             return (audio or None), data.get("mime"), data.get("language")
-        # audio/* oder multipart/form-data oder sonstige rohe Bytes
+        # audio/* or multipart/form-data or other raw bytes
         if ctype.startswith("multipart/form-data"):
             audio, mime = _extract_multipart(raw, ctype)
         else:
@@ -228,7 +227,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.startswith("/warmup"):
             if WhisperModel is None:
                 self._send(200, {"ok": False, "available": False,
-                                 "error": "faster-whisper nicht installiert",
+                                 "error": "faster-whisper not installed",
                                  "hint": PIP_HINT})
                 return
             ok = load_model()
@@ -239,17 +238,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
             return
         if WhisperModel is None:
-            self._send(200, {"error": "faster-whisper nicht installiert",
+            self._send(200, {"error": "faster-whisper not installed",
                              "hint": PIP_HINT})
             return
         try:
             audio, mime, language = self._read_audio()
         except Exception as e:  # noqa: BLE001
-            self._send(400, {"error": "ungueltiger Body: " + repr(e)})
+            self._send(400, {"error": "invalid body: " + repr(e)})
             return
         if not audio:
-            self._send(400, {"error": "kein Audio empfangen",
-                             "hint": "audio_base64 (JSON) oder rohe Bytes mit Content-Type audio/*"})
+            self._send(400, {"error": "no audio received",
+                             "hint": "audio_base64 (JSON) or raw bytes with Content-Type audio/*"})
             return
         try:
             self._send(200, transcribe_bytes(audio, mime, language))
@@ -257,17 +256,17 @@ class Handler(BaseHTTPRequestHandler):
             msg = repr(e)
             low = msg.lower()
             if "ffmpeg" in low or "winerror 2" in low or "no such file" in low or "failed to load audio" in low:
-                self._send(200, {"error": "Audio konnte nicht gelesen werden: " + msg,
-                                 "hint": "ffmpeg noetig fuer webm/ogg; oder WAV senden"})
+                self._send(200, {"error": "could not read audio: " + msg,
+                                 "hint": "ffmpeg needed for webm/ogg; or send WAV"})
             else:
                 self._send(500, {"error": msg})
 
-    def log_message(self, fmt, *args):  # kompaktes Log
+    def log_message(self, fmt, *args):  # compact log
         print("[STT] " + (fmt % args))
 
 
 def _extract_multipart(raw, ctype):
-    """Sehr einfacher multipart/form-data-Parser: erster Datei-Part -> (bytes, mime)."""
+    """Very simple multipart/form-data parser: first file part -> (bytes, mime)."""
     m = None
     for part in ctype.split(";"):
         part = part.strip()
@@ -294,9 +293,9 @@ def _extract_multipart(raw, ctype):
 
 
 if __name__ == "__main__":
-    avail = "verfuegbar" if WhisperModel is not None else ("NICHT installiert (%s)" % PIP_HINT)
+    avail = "available" if WhisperModel is not None else ("NOT installed (%s)" % PIP_HINT)
     print("[STT] faster-whisper: %s" % avail, flush=True)
-    print("[STT] HTTP auf http://%s:%d  (GET /health, GET /capabilities, POST /transcribe, POST /warmup)"
+    print("[STT] HTTP at http://%s:%d  (GET /health, GET /capabilities, POST /transcribe, POST /warmup)"
           % (HOST, PORT), flush=True)
     try:
         ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

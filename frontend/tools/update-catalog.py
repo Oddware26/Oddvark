@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Aktualisiert den Modell-Katalog für die Oddvark-Modell-Seite.
+"""Updates the model catalog for the Oddvark models page.
 
-Lädt die komplette Ollama-Library (https://ollama.com/library) und erzeugt neu:
-  - assets/js/models-catalog.js   (window.MODELS_CATALOG = {...}; -> von models.html geladen)
-  - assets/models-catalog.json    (Rohdaten)
+Fetches the complete Ollama library (https://ollama.com/library) and regenerates:
+  - assets/js/models-catalog.js   (window.MODELS_CATALOG = {...}; -> loaded by models.html)
+  - assets/models-catalog.json    (raw data)
 
-Nutzung (im frontend-Ordner):  python tools/update-catalog.py
-Benötigt nur die Python-Standardbibliothek.
+Usage (in the frontend folder):  python tools/update-catalog.py
+Requires only the Python standard library.
 """
 import json
 import re
@@ -49,14 +49,14 @@ def parse(html_src):
 
 
 def main():
-    print("Lade", LIBRARY_URL, "…")
+    print("Fetching", LIBRARY_URL, "…")
     models = parse(fetch(LIBRARY_URL))
     if not models:
-        raise SystemExit("Keine Modelle geparst – Seitenstruktur evtl. geändert.")
+        raise SystemExit("No models parsed – page structure may have changed.")
     data = {"source": "ollama.com/library", "count": len(models), "models": models}
     JSON_OUT.write_text(json.dumps(data, ensure_ascii=False, indent=0), encoding="utf-8")
     JS_OUT.write_text("window.MODELS_CATALOG = " + json.dumps(data, ensure_ascii=False) + ";", encoding="utf-8")
-    print(f"OK – {len(models)} Modelle geschrieben:")
+    print(f"OK – {len(models)} models written:")
     print(" ", JS_OUT)
     print(" ", JSON_OUT)
 

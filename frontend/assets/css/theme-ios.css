@@ -1,27 +1,27 @@
-/* Oddvark – iOS-Layer (Liquid-Glass-inspiriert). Wird in index.html UND models.html
-   als LETZTES Stylesheet geladen und verschiebt das Design dezent Richtung iOS 26:
+/* Oddvark – iOS layer (Liquid Glass-inspired). Loaded in index.html AND models.html
+   as the LAST stylesheet, nudging the design subtly toward iOS 26:
 
-   Prinzipien (Apple HIG / Liquid Glass):
-   - Glas NUR auf dem funktionalen Chrome (Menüs, Popover, Modal, Composer,
-     Sticky-Header) – Content (Transkript, Karten) bleibt opak.
-   - KEIN Glas auf Glas: Panels, die ÜBER einer Glasfläche schweben
-     (.jv-sel-menu im Modal, .jv-submenu im Popover), sind bewusst opak.
-   - Durchgehende, großzügige Radien; Kapselform für Buttons/Segmented/Switch.
-   - Ein Tint: iOS-Systemblau (Dark #0091FF); Switch-an = iOS-Grün (#30D158).
-   - prefers-reduced-transparency/-motion werden respektiert (Fallback opak). */
+   Principles (Apple HIG / Liquid Glass):
+   - Glass ONLY on the functional chrome (menus, popovers, modal, composer,
+     sticky header) – content (transcript, cards) stays opaque.
+   - NO glass on glass: panels floating ABOVE a glass surface
+     (.jv-sel-menu in the modal, .jv-submenu in the popover) are deliberately opaque.
+   - Consistent, generous radii; capsule shape for buttons/segmented/switch.
+   - One tint: iOS system blue (dark #0091FF); switch-on = iOS green (#30D158).
+   - prefers-reduced-transparency/-motion are respected (opaque fallback). */
 
-/* 1) Tint: iOS-Systemblau (Dark). Speist User-Bubble, Links, Fokus-Ringe,
-      aktive Chips, Primär-Buttons – alles var(--accent-*)-basiert. */
+/* 1) Tint: iOS system blue (dark). Feeds user bubble, links, focus rings,
+      active chips, primary buttons – all var(--accent-*)-based. */
 [data-color-version="v2"][data-theme="jarvis"][data-mode="dark"] {
   --accent-000: 206 100% 62%;
   --accent-100: 206 100% 50%;
   --accent-200: 206 100% 50%;
 }
 
-/* 2) Glas-Chrome: Menüs, Aufwand-Popup, Identitäts-Popover, Anpassen-Modal.
-      "Regular"-Material: frostig genug, dass lebhafter Content (blaue Bubbles)
-      nur als diffuse Helligkeit durchscheint, nie als Farbfläche (Lesbarkeit!).
-      0.85-Deckung über dem 8%-Grund ≈ bisherige 14%-Fläche. Lichtsaum oben. */
+/* 2) Glass chrome: menus, effort popup, identity popover, customize modal.
+      "Regular" material: frosted enough that lively content (blue bubbles)
+      shows through only as diffuse brightness, never as a color field (legibility!).
+      0.85 coverage over the 8% base ≈ the previous 14% surface. Light rim on top. */
 .jv-modelmenu,
 .jv-effort,
 .jv-an {
@@ -37,12 +37,12 @@
 .jv-an {
   box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.07), 0 24px 60px -16px hsl(0 0% 0% / 0.65);
 }
-/* Die opaken Deck-Layer würden das Glas verdecken -> transparent */
+/* The opaque cover layers would hide the glass -> transparent */
 .jv-mm-surface,
 .jv-ef-surface { background: transparent; }
 
-/* Kein Glas auf Glas: Dropdown-Panel ÜBER dem Modal und Sprach-Flyout ÜBER dem
-   Popover bleiben opak (Panel liegt auf einer Glasfläche, nicht auf Content). */
+/* No glass on glass: the dropdown panel ABOVE the modal and the language flyout ABOVE the
+   popover stay opaque (the panel sits on a glass surface, not on content). */
 .jv-sel-menu,
 .jv-submenu {
   background: hsl(48 5% 15%);
@@ -50,18 +50,18 @@
   backdrop-filter: none;
 }
 
-/* 3) Radien: durchgehend-großzügig statt klein-uniform */
+/* 3) Radii: consistently generous instead of small-uniform */
 .jv-modelmenu { border-radius: 14px; }
 .jv-effort { border-radius: 16px; }
 .jv-an { border-radius: 20px; }
 .jv-mm-item::before { inset: 2px 6px; border-radius: 9px; }
 .jv-an-input, .jv-an-textarea, .jv-an-select, .jv-sel,
 .jv-an-mem-item { border-radius: 10px; }
-.jarvis-msg .b { border-radius: 18px; } /* Ecken-Akzente (5px) aus jarvis.css bleiben (höhere Spezifität) */
+.jarvis-msg .b { border-radius: 18px; } /* corner accents (5px) from jarvis.css remain (higher specificity) */
 
-/* 4) Kapsel-Controls */
+/* 4) Capsule controls */
 .jv-an-btn { border-radius: 999px; }
-/* Segmented Control: Kapsel-Wanne + heller, schwebender Thumb (iOS-Look) */
+/* Segmented control: capsule trough + lighter, floating thumb (iOS look) */
 .jv-an-seg { border-radius: 999px; }
 .jv-an-seg-btn { border-radius: 999px; }
 .jv-an-seg-btn.is-on {
@@ -69,10 +69,10 @@
   box-shadow: 0 1px 3px hsl(0 0% 0% / 0.4), inset 0 0.5px 0 hsl(0 0% 100% / 0.08);
 }
 
-/* 5) Switch: iOS-Proportionen + Grün im An-Zustand. Knob-Weg bleibt 14px
-      (36 - 18 - 2×2), daher KEINE Änderung an translateX in jarvis.css nötig.
-      Die Akzent-Overrides der Wissen-/Notizen-Popups (blau/bernstein) gewinnen
-      weiterhin per Spezifität – gewollt (Popup-Identität). */
+/* 5) Switch: iOS proportions + green in the on state. Knob travel stays 14px
+      (36 - 18 - 2×2), so NO change to translateX in jarvis.css is needed.
+      The accent overrides of the Knowledge/Notes popups (blue/amber) still win
+      by specificity – intended (popup identity). */
 .jv-switch { width: 36px; height: 22px; border-radius: 11px; }
 .jv-switch-knob {
   width: 18px;
@@ -81,11 +81,11 @@
 }
 .jv-switch.is-on { background: #30d158; }
 
-/* 6) Modal-Backdrop: NUR dimmen, nicht blurren (iOS-Sheets blurren den Content
-      nicht flächig). Wichtig auch technisch: backdrop-filter auf dem Backdrop
-      macht ihn zur Backdrop-Root – das Glas des Modals (.jv-an) würde dann nur
-      noch den flachen Scrim sampeln und wäre wirkungslos. Ohne Backdrop-Blur
-      ist das Modal-Glas ECHT (sampelt die Seite). Eintritt mit Sheet-Kurve. */
+/* 6) Modal backdrop: ONLY dim, do not blur (iOS sheets do not blur the content
+      across the surface). Also important technically: backdrop-filter on the backdrop
+      makes it the backdrop root – the modal's glass (.jv-an) would then only
+      sample the flat scrim and be ineffective. Without a backdrop blur
+      the modal glass is REAL (samples the page). Entry with a sheet curve. */
 .jv-an-backdrop {
   background: hsl(0 0% 0% / 0.5);
   -webkit-backdrop-filter: none;
@@ -96,8 +96,8 @@
     transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* 7) Composer (Prompt-Box) als Glasleiste: Chat scrollt dahinter durch.
-      Selektor greift nur im dunklen Schema (ohne data-darker-Variante). */
+/* 7) Composer (prompt box) as a glass bar: chat scrolls through behind it.
+      Selector applies only in the dark scheme (without the data-darker variant). */
 :root[data-mode="dark"]:not([data-darker]) .epitaxy-root .epitaxy-prompt {
   --r7: 16px;
   --surface-prompt-blur: hsl(var(--bg-000) / 0.7);
@@ -107,20 +107,20 @@
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   backdrop-filter: blur(20px) saturate(150%);
 }
-/* --r7:16px vergrößert auch die Trennlinien-Höhe in .jarvis-attach::after
-   (height:var(--r7), bottom:0). Damit die Linie nicht durch die Anhang-Chips
-   schneidet, braucht die Chip-Zeile wieder ≥ r7+4 Abstand nach unten. */
+/* --r7:16px also increases the divider height in .jarvis-attach::after
+   (height:var(--r7), bottom:0). So the line does not cut through the attachment chips,
+   the chip row again needs ≥ r7+4 spacing at the bottom. */
 .jarvis-attach { padding-bottom: 20px; }
 
 /* ===== models.html ===== */
-/* Sticky-Header: echtes Glas (Content scrollt darunter durch) */
+/* Sticky header: real glass (content scrolls through beneath it) */
 .mdl-header {
   background: hsl(var(--bg-100) / 0.72);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
 }
-/* Sortier-Dropdown: Glas-Popover wie die Chat-Menüs; breit genug für den
-   längsten Eintrag (einzeilig) + gleicher Selektionsstil (Tint-Pille + Haken) */
+/* Sort dropdown: glass popover like the chat menus; wide enough for the
+   longest entry (single line) + same selection style (tint pill + checkmark) */
 .mdl-sort-menu {
   background: hsl(var(--bg-300) / 0.85);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
@@ -133,21 +133,21 @@
 .mdl-sort-item { border-radius: 9px; white-space: nowrap; }
 .mdl-sort-item[aria-checked="true"] { background: hsl(var(--text-100) / 0.08); }
 .mdl-search input { border-radius: 12px; }
-/* Kapsel-Buttons + iOS-Tabs (Glider wird Kapsel-Thumb) */
+/* Capsule buttons + iOS tabs (glider becomes a capsule thumb) */
 .mdl-back, .mdl-set, .mdl-dl { border-radius: 999px; }
 .mdl-dl .mdl-dl-fill { border-radius: 999px; }
 .mdl-tabs { border-radius: 999px; }
 .mdl-tab { border-radius: 999px; }
 .mdl-tabs .mdl-tab-glider {
   border-radius: 999px;
-  /* heller als die bg-200-Karte, damit der aktive Tab klar abliest
-     (wie der Segmented-Thumb im Anpassen-Modal) */
+  /* lighter than the bg-200 card so the active tab reads clearly
+     (like the segmented thumb in the customize modal) */
   background: hsl(48 5% 16%);
   box-shadow: 0 1px 3px hsl(0 0% 0% / 0.45), inset 0 0.5px 0 hsl(0 0% 100% / 0.06);
 }
 
-/* iOS-artige Scrollbars: schlank, abgerundet, ohne Pfeil-Buttons.
-   Spezifischere Scroller (.jv-mm-scroll, .jv-an-body) behalten ihre Regeln. */
+/* iOS-like scrollbars: slim, rounded, without arrow buttons.
+   More specific scrollers (.jv-mm-scroll, .jv-an-body) keep their rules. */
 *::-webkit-scrollbar { width: 9px; height: 9px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
@@ -158,7 +158,7 @@
 }
 *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 
-/* ===== A11y-Fallbacks ===== */
+/* ===== A11y fallbacks ===== */
 @media (prefers-reduced-transparency: reduce) {
   .jv-modelmenu, .jv-effort, .jv-an, .jv-sel-menu, .jv-submenu, .mdl-sort-menu {
     background: hsl(48 5% 14%);

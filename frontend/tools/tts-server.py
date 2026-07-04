@@ -1,20 +1,20 @@
 """
-Oddvark - lokaler XTTS-v2 TTS-Server (hyperrealistisch, mehrsprachig, viele Stimmen).
+Oddvark - local XTTS-v2 TTS server (hyper-realistic, multilingual, many voices).
 
-Laedt Coqui XTTS-v2 (coqui-tts) und stellt eine kleine HTTP-API bereit, die das
-Oddvark-Frontend (file:// oder http://localhost) per fetch aufruft:
+Loads Coqui XTTS-v2 (coqui-tts) and exposes a small HTTP API that the
+Oddvark frontend (file:// or http://localhost) calls via fetch:
 
   GET  /health   -> {"ready": bool, "error": str|null, "voices": int, "languages": [...]}
-  GET  /voices   -> {"voices": [Sprecher...], "languages": [{code,label}...]}
-  POST /speak     -> audio/wav (binaer)
-       Body: {"text": "...", "voice": "Sprechername", "language": "de", "speed": 1.0,
-              "speaker_wav": "data:audio/wav;base64,..."?}   # speaker_wav = Stimmen-Klonen (optional)
+  GET  /voices   -> {"voices": [speakers...], "languages": [{code,label}...]}
+  POST /speak     -> audio/wav (binary)
+       Body: {"text": "...", "voice": "speaker name", "language": "de", "speed": 1.0,
+              "speaker_wav": "data:audio/wav;base64,..."?}   # speaker_wav = voice cloning (optional)
 
 Start:
-  tools/start-tts.bat   (nutzt tools/tts-venv)
+  tools/start-tts.bat   (uses tools/tts-venv)
 
-Voraussetzungen: coqui-tts + torch(CUDA) in tools/tts-venv (isoliert).
-XTTS-v2: 17 Sprachen inkl. Deutsch, ~58 eingebaute Sprecher, Voice-Cloning aus ~6s Sample.
+Requirements: coqui-tts + torch(CUDA) in tools/tts-venv (isolated).
+XTTS-v2: 17 languages incl. German, ~58 built-in speakers, voice cloning from a ~6s sample.
 """
 import io
 import os
@@ -25,15 +25,15 @@ import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-os.environ.setdefault("COQUI_TOS_AGREED", "1")   # Lizenz nicht-interaktiv akzeptieren
+os.environ.setdefault("COQUI_TOS_AGREED", "1")   # accept the license non-interactively
 os.environ.setdefault("COQUI_TTS_NO_MECAB", "1")
 
 HOST = os.environ.get("TTS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("TTS_PORT", "7862"))
 MODEL = os.environ.get("TTS_MODEL", "tts_models/multilingual/multi-dataset/xtts_v2")
-DEVICE = os.environ.get("TTS_DEVICE", "cuda")  # "cuda" oder "cpu"
+DEVICE = os.environ.get("TTS_DEVICE", "cuda")  # "cuda" or "cpu"
 
-# Freundliche Sprachnamen fuer die im Modell unterstuetzten Codes
+# Friendly language names for the codes supported by the model
 LANG_LABELS = {
     "de": "Deutsch", "en": "English", "es": "Espanol", "fr": "Francais", "it": "Italiano",
     "pt": "Portugues", "pl": "Polski", "tr": "Turkce", "ru": "Russkij", "nl": "Nederlands",
@@ -47,7 +47,7 @@ load_err = None
 voices = []
 languages = []
 sample_rate = 24000
-gen_lock = threading.Lock()   # GPU-gebunden -> nur eine Synthese gleichzeitig
+gen_lock = threading.Lock()   # GPU-bound -> only one synthesis at a time
 
 
 def load_model():
@@ -55,7 +55,7 @@ def load_model():
     try:
         import torch
         from TTS.api import TTS as CoquiTTS
-        print("[tts] lade %s auf %s ..." % (MODEL, DEVICE), flush=True)
+        print("[tts] loading %s on %s ..." % (MODEL, DEVICE), flush=True)
         dev = DEVICE if (DEVICE != "cuda" or torch.cuda.is_available()) else "cpu"
         m = CoquiTTS(MODEL, progress_bar=False).to(dev)
         tts = m
@@ -72,14 +72,14 @@ def load_model():
         except Exception:
             sample_rate = 24000
         ready = True
-        print("[tts] bereit. %d Stimmen, %d Sprachen, %d Hz (%s)." % (len(voices), len(languages), sample_rate, dev), flush=True)
+        print("[tts] ready. %d voices, %d languages, %d Hz (%s)." % (len(voices), len(languages), sample_rate, dev), flush=True)
     except Exception as e:  # noqa: BLE001
         load_err = repr(e)
-        print("[tts] LADEFEHLER:", e, flush=True)
+        print("[tts] LOAD ERROR:", e, flush=True)
 
 
 def _wav_bytes(samples):
-    """float-Liste/np-Array (-1..1) -> 16-bit PCM WAV (stdlib, keine Extra-Deps)."""
+    """float list/np array (-1..1) -> 16-bit PCM WAV (stdlib, no extra deps)."""
     import numpy as np
     a = np.asarray(samples, dtype="float32")
     a = np.clip(a, -1.0, 1.0)
@@ -94,7 +94,7 @@ def _wav_bytes(samples):
 
 
 def _decode_wav_to_temp(data_url):
-    """data:audio/...;base64,XXXX -> temp .wav Pfad (fuer Voice-Cloning)."""
+    """data:audio/...;base64,XXXX -> temp .wav path (for voice cloning)."""
     s = data_url or ""
     if "," in s and s.strip().startswith("data:"):
         s = s.split(",", 1)[1]
@@ -173,17 +173,17 @@ class Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
             return
         if not ready:
-            self._json(503, {"error": load_err or "Modell laedt noch - gleich erneut versuchen."})
+            self._json(503, {"error": load_err or "model still loading - try again shortly."})
             return
         try:
             n = int(self.headers.get("Content-Length") or 0)
             data = json.loads(self.rfile.read(n) or b"{}")
         except Exception as e:  # noqa: BLE001
-            self._json(400, {"error": "ungueltiger Body: " + repr(e)})
+            self._json(400, {"error": "invalid body: " + repr(e)})
             return
         text = (data.get("text") or "").strip()
         if not text:
-            self._json(400, {"error": "text fehlt"})
+            self._json(400, {"error": "text missing"})
             return
         try:
             wav = synth(text, data.get("voice"), data.get("language"),
@@ -199,7 +199,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     threading.Thread(target=load_model, daemon=True).start()
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
-    print("[tts] HTTP auf http://%s:%d  (GET /health, GET /voices, POST /speak)" % (HOST, PORT), flush=True)
+    print("[tts] HTTP at http://%s:%d  (GET /health, GET /voices, POST /speak)" % (HOST, PORT), flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

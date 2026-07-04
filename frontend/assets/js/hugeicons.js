@@ -1,6 +1,6 @@
-/* HugeIcons Free 4.2.2 (MIT, hugeicons.com) – zentrale Icon-Bibliothek.
-   Alle Icons: viewBox 0 0 24 24, stroke currentColor 1.5. Erzeugt aus @hugeicons/core-free-icons;
-   neue Icons dort nachschlagen und hier ergaenzen. window.HI(name, {cls,size,style}) -> SVG-String. */
+/* HugeIcons Free 4.2.2 (MIT, hugeicons.com) – central icon library.
+   All icons: viewBox 0 0 24 24, stroke currentColor 1.5. Generated from @hugeicons/core-free-icons;
+   look up new icons there and add them here. window.HI(name, {cls,size,style}) -> SVG string. */
 (function () {
   "use strict";
   var P = {

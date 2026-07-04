@@ -1,8 +1,8 @@
-/* Oddvark – eigenes Chat-CSS (Oddware). Von Grund auf geschrieben.
-   Dieser Teil deckt den Composer (Prompt-Box + Toolbar) ab.
-   Nutzt die bestehenden Design-Tokens (--bg-*, --text-*, --accent-*), Schrift ist Rubik. */
+/* Oddvark – custom chat CSS (Oddware). Written from scratch.
+   This part covers the composer (prompt box + toolbar).
+   Uses the existing design tokens (--bg-*, --text-*, --accent-*), font is Rubik. */
 
-/* ---------- Prompt-Box (abgerundete Eingabe-Pille mit Senden-Pfeil) ---------- */
+/* ---------- Prompt box (rounded input pill with send arrow) ---------- */
 .jv-inputbar {
   position: relative;
   display: flex;
@@ -34,7 +34,7 @@
   line-height: 1.45;
 }
 .jv-inputbar .jv-input p { margin: 0; }
-/* Placeholder-Mechanismus: app.js toggelt is-empty/is-editor-empty auf dem <p> */
+/* Placeholder mechanism: app.js toggles is-empty/is-editor-empty on the <p> */
 .jv-inputbar .jv-input p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: hsl(var(--text-100) / 0.32);
@@ -44,7 +44,7 @@
   white-space: nowrap;
 }
 
-/* Senden-Pfeil unten rechts in der Pille */
+/* Send arrow at the bottom right of the pill */
 .jv-send {
   flex: 0 0 auto;
   align-self: flex-end;
@@ -67,7 +67,7 @@
 .jv-send:disabled { opacity: 0.4; cursor: default; }
 .jv-send svg { width: 18px; height: 18px; }
 
-/* ---------- Toolbar unter der Prompt-Box ---------- */
+/* ---------- Toolbar below the prompt box ---------- */
 .jv-toolbar {
   display: flex;
   align-items: center;
@@ -78,7 +78,7 @@
 .jv-toolbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .jv-toolbar-right { display: flex; align-items: center; gap: 6px; margin-left: auto; min-width: 0; }
 
-/* gemeinsame Basis für die Toolbar-Buttons */
+/* shared base for the toolbar buttons */
 .jv-tb-btn {
   display: inline-flex;
   align-items: center;
@@ -100,12 +100,12 @@
 .jv-tb-btn:active { transform: scale(0.97); }
 .jv-tb-btn:focus-visible { box-shadow: 0 0 0 2px hsl(var(--accent-100) / 0.5); }
 .jv-tb-btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
-.jv-tb-icon { width: 34px; justify-content: center; padding: 0; } /* icon-only (Plus) */
+.jv-tb-icon { width: 34px; justify-content: center; padding: 0; } /* icon-only (plus) */
 
-/* Mode-Pille (Farbe setzt app.js per inline style je Modus) */
+/* Mode pill (color set by app.js via inline style per mode) */
 .jv-tb-mode { font-weight: 400; }
 
-/* Mic-Pille (Aufnahme + Diktat-Einstellungen als ein Segment) */
+/* Mic pill (recording + dictation settings as one segment) */
 .jv-mic-pill {
   display: inline-flex;
   align-items: center;
@@ -133,22 +133,22 @@
 .jv-mic-set { padding-right: 9px; }
 .jv-mic-btn:hover, .jv-mic-set:hover { color: hsl(var(--text-100)); }
 .jv-mic-btn svg, .jv-mic-set svg { width: 17px; height: 17px; }
-/* Zustände, die app.js über data-* / Klassen am Pill setzt */
+/* States that app.js sets via data-* / classes on the pill */
 .jv-mic-pill[data-recording] { background: hsl(var(--accent-100) / 0.16); }
 .jv-mic-pill[data-recording] .jv-mic-btn { color: hsl(var(--accent-100)); }
 .jv-mic-pill[data-error] { background: hsl(var(--core-red, 0 73% 59%) / 0.16); }
 
-/* Model + Effort rechts */
+/* Model + effort on the right */
 .jv-tb-model, .jv-tb-effort { color: hsl(var(--text-200)); }
 .jv-tb-effort { font-weight: 400; }
-/* Modellname darf nie die linke Gruppe überlappen: schrumpfbar + Ellipsis (v. a. lange hf.co-Namen). */
+/* Model name must never overlap the left group: shrinkable + ellipsis (especially long hf.co names). */
 .jv-tb-model { min-width: 0; }
 .jv-tb-model span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jv-tb-effort { flex: 0 0 auto; }
 
-/* ============================== Chat-Bereich (Welcome + Transkript) ============================== */
-/* .dframe-content / .dframe-content-inner werden in theme.css positioniert (Sidebar-Abstand);
-   .epitaxy-composer-width zentriert die Inhalte (max-width). */
+/* ============================== Chat area (welcome + transcript) ============================== */
+/* .dframe-content / .dframe-content-inner are positioned in theme.css (sidebar spacing);
+   .epitaxy-composer-width centers the contents (max-width). */
 .jv-chat {
   display: flex;
   flex-direction: column;
@@ -189,7 +189,7 @@
   padding: 4px 0 16px;
 }
 
-/* ============================== Sidebar (eigenes Markup) ============================== */
+/* ============================== Sidebar (custom markup) ============================== */
 .jv-skip {
   position: absolute; left: -9999px; top: 0; z-index: 50;
 }
@@ -270,8 +270,8 @@
 .jv-sb-avatar { width: 20px; height: 20px; border-radius: 50%; background: hsl(var(--text-100) / 0.12); flex: 0 0 auto; }
 .jv-sb-account-name { font-size: 13px; }
 
-/* Die drei Toolbar-Icons (+, Mikrofon, Lautsprecher) exakt gleich groß – gewinnt gegen
-   frühere Regeln und die Inline-Größen der HI-SVGs. */
+/* The three toolbar icons (+, microphone, speaker) exactly the same size – wins against
+   earlier rules and the inline sizes of the HI SVGs. */
 .jv-tb-icon svg,
 .jv-mic-btn svg,
 .jarvis-tts-btn svg {

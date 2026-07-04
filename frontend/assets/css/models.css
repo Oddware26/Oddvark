@@ -1,8 +1,8 @@
-/* Oddvark – Modell-Bibliothek. Nutzt die Design-Tokens aus theme.css
-   (hsl(var(--bg-100)) etc.) und übernimmt Easing/Popup-Gefühl aus app.css. */
+/* Oddvark – model library. Uses the design tokens from theme.css
+   (hsl(var(--bg-100)) etc.) and carries over the easing/popup feel from app.css. */
 
 :root {
-  /* Starkes ease-out wie in jarvis.css – gibt Animationen Punch */
+  /* Strong ease-out like in jarvis.css – gives animations punch */
   --mdl-ease: cubic-bezier(0.23, 1, 0.32, 1);
   --mdl-radius: 16px;
   --mdl-radius-sm: 10px;
@@ -23,7 +23,7 @@ body {
 }
 
 /* ----------------------------------------------------------------------------
-   Kopfbereich (sticky)
+   Header area (sticky)
    ------------------------------------------------------------------------- */
 .mdl-header {
   position: sticky;
@@ -44,7 +44,7 @@ body {
   gap: 14px;
 }
 
-/* Zurück-Button: Pfeil-Icon + Text */
+/* Back button: arrow icon + text */
 .mdl-back {
   display: inline-flex;
   align-items: center;
@@ -79,7 +79,7 @@ body {
   white-space: nowrap;
 }
 
-/* Hinweisleiste (Ollama offline) – dezent, einklappbar via [hidden] */
+/* Notice bar (Ollama offline) – subtle, collapsible via [hidden] */
 .mdl-notice {
   display: flex;
   align-items: center;
@@ -94,7 +94,7 @@ body {
 .mdl-notice .mdl-ico { width: 16px; height: 16px; flex: 0 0 auto; color: hsl(var(--text-500)); }
 .mdl-notice[hidden] { display: none; }
 
-/* Steuerleiste: Suche, Chips, Sortierung */
+/* Control bar: search, chips, sorting */
 .mdl-controls {
   display: flex;
   align-items: center;
@@ -136,7 +136,7 @@ body {
   box-shadow: 0 0 0 3px hsl(var(--accent-100) / 0.18);
 }
 
-/* Filter-Chips */
+/* Filter chips */
 .mdl-chips {
   display: flex;
   align-items: center;
@@ -175,7 +175,7 @@ body {
   border-color: transparent;
 }
 
-/* Sortierung */
+/* Sorting */
 .mdl-sort {
   display: inline-flex;
   align-items: center;
@@ -184,7 +184,7 @@ body {
   font-size: 13px;
   color: hsl(var(--text-500));
 }
-/* Custom Dropdown (ersetzt natives <select> – projektweit nur custom Popups). */
+/* Custom dropdown (replaces native <select> – project-wide only custom popups). */
 .mdl-sort-trigger {
   display: inline-flex;
   align-items: center;
@@ -246,7 +246,7 @@ body {
 .mdl-sort-item[aria-checked="true"] .mdl-sort-check { opacity: 1; }
 
 /* ----------------------------------------------------------------------------
-   Grid / Karten
+   Grid / cards
    ------------------------------------------------------------------------- */
 .mdl-grid {
   flex: 1 1 auto;
@@ -256,10 +256,10 @@ body {
   padding: 20px clamp(16px, 4vw, 40px) 56px;
   align-content: start;
 }
-/* Trigger fürs Nachladen der Library beim Scrollen (unsichtbar, volle Zeilenbreite) */
+/* Trigger for lazy-loading the library while scrolling (invisible, full row width) */
 .mdl-sentinel { grid-column: 1 / -1; height: 1px; }
 
-/* Dezenter Lade-Indikator am Listenende – nur während des Nachladens sichtbar/animiert. */
+/* Subtle loading indicator at the end of the list – only visible/animated during lazy-loading. */
 .mdl-more {
   grid-column: 1 / -1;
   display: flex;
@@ -300,11 +300,11 @@ body {
   background: hsl(var(--bg-200));
   border: 1px solid hsl(var(--text-100) / 0.08);
   border-radius: var(--mdl-radius);
-  /* Schatten in Hintergrundfarbe getönt, nicht reines Schwarz */
+  /* Shadow tinted in the background color, not pure black */
   box-shadow: 0 1px 2px hsl(var(--bg-400) / 0.4);
   transition: border-color 160ms var(--mdl-ease), transform 160ms var(--mdl-ease),
     box-shadow 160ms var(--mdl-ease);
-  /* Stagger-Eintritt: nie aus scale(0), immer aus scale(0.98)+opacity */
+  /* Stagger entry: never from scale(0), always from scale(0.98)+opacity */
   opacity: 0;
   transform: translateY(8px) scale(0.99);
   animation: mdl-card-in 320ms var(--mdl-ease) forwards;
@@ -323,7 +323,7 @@ body {
   .mdl-card:hover .mdl-hero { transform: scale(1.04); }
 }
 
-/* ---- Hero-Bild (16:9) mit deterministischem Verlauf-Fallback ----------- */
+/* ---- Hero image (16:9) with deterministic gradient fallback ----------- */
 .mdl-hero-wrap {
   position: relative;
   width: 100%;
@@ -331,8 +331,8 @@ body {
   overflow: hidden;
   border-top-left-radius: var(--mdl-radius);
   border-top-right-radius: var(--mdl-radius);
-  /* Fallback: immer sichtbarer Verlauf aus dem Namen-Hash.
-     Bleibt stehen, falls das <img> nicht lädt (offline). */
+  /* Fallback: always-visible gradient derived from the name hash.
+     Stays in place if the <img> fails to load (offline). */
   background:
     radial-gradient(120% 120% at 20% 0%,
       hsl(calc(var(--hero-hue, 250) * 1deg) 60% 20%) 0%,
@@ -346,14 +346,14 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
-  /* Sanft einblenden; transform für Hover-Zoom (GPU-beschleunigt) */
+  /* Fade in gently; transform for hover zoom (GPU-accelerated) */
   opacity: 1;
   transform: scale(1);
   transition: transform 320ms var(--mdl-ease), opacity 240ms var(--mdl-ease);
 }
-/* Bildfehler -> nur der Verlauf bleibt sichtbar */
+/* Image error -> only the gradient remains visible */
 .mdl-hero.is-failed { opacity: 0; }
-/* Leichte Abdunklung unten für besseren Übergang zum Body */
+/* Slight darkening at the bottom for a better transition to the body */
 .mdl-hero-wrap::after {
   content: "";
   position: absolute;
@@ -401,14 +401,14 @@ body {
   font-size: 13.5px;
   line-height: 1.5;
   color: hsl(var(--text-300));
-  /* Max. 2–3 Zeilen, dezent */
+  /* Max. 2–3 lines, subtle */
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* ---- Badge-Reihe (Fähigkeiten + Größen-Chips) -------------------------- */
+/* ---- Badge row (capabilities + size chips) -------------------------- */
 .mdl-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .mdl-badge {
   display: inline-flex;
@@ -431,7 +431,7 @@ body {
 .mdl-badge[data-cap="audio"]     { color: #ff9fb8; background: #4a1f2c33; border-color: #6e2f4244; }
 .mdl-badge-hf                    { color: #ffd45f; background: #4a3a1033; border-color: #6e562844; }
 
-/* Installiert-Badge im Kopf */
+/* Installed badge in the header */
 .mdl-badge.is-installed {
   color: #8fe3b0;
   background: #1d3e2c4d;
@@ -439,7 +439,7 @@ body {
 }
 .mdl-badge.is-installed .mdl-ico { width: 12px; height: 12px; margin-right: 3px; }
 
-/* Größen-Chips – auswählbar, blau getönt */
+/* Size chips – selectable, blue-tinted */
 .mdl-chips-sizes { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .mdl-size-chip {
   display: inline-flex;
@@ -464,13 +464,13 @@ body {
 @media (hover: hover) and (pointer: fine) {
   .mdl-size-chip:hover { border-color: #2c5a80aa; color: #a9dcff; }
 }
-/* Aktive (gewählte) Größe – kräftiges Blau */
+/* Active (selected) size – strong blue */
 .mdl-size-chip[aria-pressed="true"] {
   color: hsl(var(--oncolor-100));
   background: #2f72c0;
   border-color: transparent;
 }
-/* Installierte Größe – grünes Häkchen, dezent grün getönt */
+/* Installed size – green checkmark, subtly green-tinted */
 .mdl-size-chip.is-installed { color: #8fe3b0; border-color: #2b5d4255; background: #1d3e2c4d; }
 .mdl-size-chip.is-installed[aria-pressed="true"] {
   color: hsl(var(--oncolor-100));
@@ -478,7 +478,7 @@ body {
   border-color: transparent;
 }
 
-/* ---- Aktions-Sektion: Trennlinie + Tabs + Box + Lade-Zeile ------------- */
+/* ---- Action section: divider + tabs + box + loading row ------------- */
 .mdl-action {
   display: flex;
   flex-direction: column;
@@ -499,9 +499,9 @@ body {
   border: 1px solid hsl(var(--text-100) / 0.08);
   border-radius: var(--mdl-radius-sm);
 }
-/* Gleitender Indikator (nur transform animiert -> GPU).
-   Breite = eine Spalte: Innenbreite (100% - 6px Padding - 2px Gap) / 2.
-   Zweiter Tab -> translateX um eine Spaltenbreite + Gap. */
+/* Sliding indicator (only transform animated -> GPU).
+   Width = one column: inner width (100% - 6px padding - 2px gap) / 2.
+   Second tab -> translateX by one column width + gap. */
 .mdl-tabs .mdl-tab-glider {
   position: absolute;
   top: 3px;
@@ -535,10 +535,10 @@ body {
 .mdl-tab[aria-selected="true"] { color: hsl(var(--text-100)); }
 .mdl-tab:active { transform: scale(0.97); }
 
-/* Aktions-Box (Inhalt je Tab) */
+/* Action box (content per tab) */
 .mdl-action-box { display: flex; flex-direction: column; gap: 8px; }
 
-/* Befehls-Box (Tab Ollama) */
+/* Command box (Ollama tab) */
 .mdl-cmd {
   display: flex;
   align-items: center;
@@ -585,14 +585,14 @@ body {
 @media (hover: hover) and (pointer: fine) {
   .mdl-copy:hover { color: hsl(var(--text-100)); border-color: hsl(var(--text-100) / 0.2); }
 }
-/* Kopiert-Feedback (2 s) */
+/* Copied feedback (2 s) */
 .mdl-copy.is-copied {
   color: #8fe3b0;
   border-color: #2b5d4266;
   background: #1d3e2c33;
 }
 
-/* Primär-Button (Tab "In Oddvark") */
+/* Primary button (tab "In Oddvark") */
 .mdl-set {
   display: inline-flex;
   align-items: center;
@@ -631,7 +631,7 @@ body {
 }
 .mdl-set-hint .mdl-ico { width: 13px; height: 13px; }
 
-/* ---- Lade-Zeile für die gewählte Größe (Download beibehalten) ---------- */
+/* ---- Loading row for the selected size (keeps the download) ---------- */
 .mdl-dl-row { display: flex; }
 .mdl-dl {
   position: relative;
@@ -662,7 +662,7 @@ body {
   .mdl-dl:hover { border-color: hsl(var(--accent-100) / 0.5); color: hsl(var(--text-100)); }
 }
 
-/* Fortschritts-Füllung (clip-path-frei: einfacher animierter Hintergrund) */
+/* Progress fill (clip-path-free: simple animated background) */
 .mdl-dl .mdl-dl-fill {
   position: absolute;
   left: 0;
@@ -674,7 +674,7 @@ body {
   transition: width 200ms var(--mdl-ease);
 }
 
-/* Pull läuft: Button als Statusanzeige, nicht klickbar */
+/* Pull running: button as a status display, not clickable */
 .mdl-dl[data-state="busy"] { cursor: default; }
 .mdl-dl[data-state="error"] {
   background: hsl(var(--danger-100) / 0.18);
@@ -682,7 +682,7 @@ body {
   color: hsl(var(--danger-000));
 }
 
-/* Bereits installierte Größe: kein Button, nur Häkchen-Status */
+/* Already installed size: no button, just checkmark status */
 .mdl-size-installed {
   display: inline-flex;
   align-items: center;
@@ -701,7 +701,7 @@ body {
 .mdl-size-installed .mdl-ico { width: 14px; height: 14px; }
 
 /* ----------------------------------------------------------------------------
-   Leer-Zustand
+   Empty state
    ------------------------------------------------------------------------- */
 .mdl-empty {
   grid-column: 1 / -1;
@@ -722,7 +722,7 @@ body {
 }
 .mdl-empty-sub { font-size: 13px; max-width: 380px; }
 
-/* Scrollbar – an jarvis.css angelehnt */
+/* Scrollbar – modeled after jarvis.css */
 *::-webkit-scrollbar { width: 11px; }
 *::-webkit-scrollbar-thumb {
   background: hsl(var(--text-500) / 0.35);
@@ -738,8 +738,8 @@ body {
     opacity: 1;
     transform: none;
   }
-  /* Bewegung (transform) entfernen, Farb-/Opazitäts-Übergänge dürfen bleiben.
-     Daher gezielt transition: none nur dort, wo Bewegung entsteht. */
+  /* Remove motion (transform), color/opacity transitions may stay.
+     Hence transition: none targeted only where motion occurs. */
   .mdl-back,
   .mdl-chip,
   .mdl-dl,
@@ -752,7 +752,7 @@ body {
   .mdl-hero,
   .mdl-dl .mdl-dl-fill { transition: none; }
   .mdl-card:hover .mdl-hero { transform: none; }
-  /* :active-Skalierung neutralisieren */
+  /* Neutralize :active scaling */
   .mdl-back:active,
   .mdl-chip:active,
   .mdl-dl:active,
@@ -769,7 +769,7 @@ body {
 }
 
 /* ----------------------------------------------------------------------------
-   "PC scannen": Button, Ergebnis-Panel, Fit-Badges, Benchmark
+   "Scan PC": button, result panel, fit badges, benchmark
    ------------------------------------------------------------------------- */
 .mdl-scan {
   display: inline-flex;
@@ -863,7 +863,7 @@ body {
 }
 .mdl-scan-none { margin: 10px 0 2px; font-size: 13px; color: hsl(var(--text-400)); }
 
-/* Empfehlungszeilen: keine Karten, nur Trennlinien (dichte Daten-Ansicht) */
+/* Recommendation rows: no cards, only dividers (dense data view) */
 .mdl-recs { display: flex; flex-direction: column; }
 .mdl-rec {
   display: flex;
@@ -898,7 +898,7 @@ body {
 .mdl-rec .mdl-dl { width: auto; flex: 0 0 auto; height: 28px; font-size: 12px; padding: 0 10px; }
 .mdl-rec .mdl-size-installed { width: auto; flex: 0 0 auto; height: 28px; font-size: 12px; padding: 0 10px; }
 
-/* Fit-Badges: gleiche Idiomatik wie .mdl-size-installed (bewusst Hartwerte im Dark-Theme) */
+/* Fit badges: same idiom as .mdl-size-installed (deliberately hard-coded values in the dark theme) */
 .mdl-fit {
   display: inline-flex;
   align-items: center;
@@ -952,7 +952,7 @@ body {
 .mdl-bench-load { color: hsl(var(--text-500)); }
 .mdl-bench-done { margin-top: 8px; font-size: 12px; color: #8fe3b0; }
 
-/* Skeleton-Shimmer (Ladezustand statt Spinner) */
+/* Skeleton shimmer (loading state instead of a spinner) */
 .mdl-skel {
   display: inline-block;
   height: 14px;

@@ -1,29 +1,29 @@
 # -*- coding: utf-8 -*-
-# Oddvark - lokaler "Aktions-Server": gibt dem Sprachassistenten echten PC-/Browser-/Vision-Zugriff.
-# Port 7864, bindet NUR an 127.0.0.1 (loopback). ThreadingHTTPServer, reine stdlib im Kern.
+# Oddvark - local "action server": gives the voice assistant real PC/browser/vision access.
+# Port 7864, binds ONLY to 127.0.0.1 (loopback). ThreadingHTTPServer, pure stdlib at its core.
 #
-# SICHERHEIT / AUTH:
-#   - Der Server lauscht ausschliesslich auf 127.0.0.1. Es gibt bewusst KEIN Token-/Passwort-Auth,
-#     weil nur lokale Prozesse (das Oddvark-Frontend auf http://localhost:8000) ihn erreichen koennen.
-#     Wer lokalen Zugriff hat, koennte diese Aktionen ohnehin selbst ausfuehren.
-#   - "Confirm-by-default": riskante Aktionen (delete/move/overwrite/power/run_code/send_email/
-#     browser_act/organize/close_app/unbekannte open_app/agent_task) werden NICHT ungefragt
-#     ausgefuehrt. Erste Anfrage ohne "confirm":true liefert {"needs_confirm":true, ...,"token":...};
-#     erst eine zweite Anfrage mit "confirm":true (oder gueltigem "token") fuehrt aus.
-#   - Browser-Aktionen nur gegen die Domain-Allowlist aus config.json (fnmatch, Wildcards).
-#   - Jede ausgefuehrte Aktion wird geloggt (In-Memory + tools/action-log.jsonl), Secrets maskiert.
+# SECURITY / AUTH:
+#   - The server listens exclusively on 127.0.0.1. There is deliberately NO token/password auth,
+#     because only local processes (the Oddvark frontend at http://localhost:8000) can reach it.
+#     Anyone with local access could perform these actions themselves anyway.
+#   - "Confirm-by-default": risky actions (delete/move/overwrite/power/run_code/send_email/
+#     browser_act/organize/close_app/unknown open_app/agent_task) are NOT executed without asking.
+#     A first request without "confirm":true returns {"needs_confirm":true, ...,"token":...};
+#     only a second request with "confirm":true (or a valid "token") actually executes.
+#   - Browser actions run only against the domain allowlist from config.json (fnmatch, wildcards).
+#   - Every executed action is logged (in-memory + tools/action-log.jsonl), secrets masked.
 #
-# OPTIONALE FAEHIGKEITEN (jeweils try/except; Feature degradiert sauber wenn Lib fehlt):
-#   psutil    -> volle system_info / network_info      (pip install psutil)
-#   Pillow    -> Screenshots + Skalierung              (pip install pillow)   [ODER mss]
-#   mss       -> schnelle Screenshots                  (pip install mss)
-#   pyautogui -> Maus/Tastatur + agent_task            (pip install pyautogui)
-#   pyperclip -> Zwischenablage (Fallback: clip.exe / powershell Get-Clipboard)
-#   pygetwindow -> Fensterliste (optional)
+# OPTIONAL CAPABILITIES (each try/except; feature degrades cleanly when the lib is missing):
+#   psutil    -> full system_info / network_info       (pip install psutil)
+#   Pillow    -> screenshots + scaling                 (pip install pillow)   [OR mss]
+#   mss       -> fast screenshots                      (pip install mss)
+#   pyautogui -> mouse/keyboard + agent_task           (pip install pyautogui)
+#   pyperclip -> clipboard (fallback: clip.exe / powershell Get-Clipboard)
+#   pygetwindow -> window list (optional)
 #
-# ENDPUNKTE: siehe do_GET / do_POST unten. GET /capabilities listet, was verfuegbar ist.
+# ENDPOINTS: see do_GET / do_POST below. GET /capabilities lists what is available.
 #
-# Konfiguration: frontend/config.json (Struktur siehe config.example.json). KEINE Secrets im Code.
+# Configuration: frontend/config.json (structure see config.example.json). NO secrets in the code.
 
 import os
 import io
@@ -50,7 +50,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("JARVIS_ACTION_PORT", "7864"))
-VISION_MODEL = os.environ.get("JARVIS_VISION_MODEL", "qwen2.5vl:7b")  # ggf. via config.json "vision_model" ueberschrieben (s. u.)
+VISION_MODEL = os.environ.get("JARVIS_VISION_MODEL", "qwen2.5vl:7b")  # may be overridden via config.json "vision_model" (see below)
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
@@ -62,10 +62,10 @@ LOG_FILE = os.path.join(_HERE, "action-log.jsonl")
 
 IS_WIN = (os.name == "nt")
 if IS_WIN:
-    import ctypes  # Media-Keys / Lautstaerke / LockWorkStation (stdlib)
+    import ctypes  # media keys / volume / LockWorkStation (stdlib)
 
 # ---------------------------------------------------------------------------
-# Optionale Libs
+# Optional libs
 # ---------------------------------------------------------------------------
 def _try(name):
     try:
@@ -85,46 +85,46 @@ if _HAS_PSUTIL:
     import psutil  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Konfiguration
+# Configuration
 # ---------------------------------------------------------------------------
 DEFAULT_CONFIG = {
     "app_whitelist": {
-        "Rechner": "calc.exe",
-        "Editor": "notepad.exe",
+        "Calculator": "calc.exe",
+        "Notepad": "notepad.exe",
         "Explorer": "explorer.exe",
         "Browser": "cmd /c start \"\" \"https://www.google.com\"",
     },
-    # Leere Liste = KEINE Domain-Einschränkung (nur öffentliche Hosts, SSRF-Schutz bleibt).
-    # Nur füllen, wenn das server-seitige Lesen/Automatisieren bewusst auf bestimmte Domains
-    # beschränkt werden soll. Das bloße ÖFFNEN einer Website (open_url) ist NIE eingeschränkt.
+    # Empty list = NO domain restriction (public hosts only, SSRF protection stays).
+    # Only fill this in if server-side reading/automation should deliberately be limited to
+    # certain domains. Merely OPENING a website (open_url) is NEVER restricted.
     "allowed_domains": [],
     "smtp": {"host": "", "port": 587, "user": "", "password": "", "from": "", "tls": True},
     "confirm_required": ["delete", "move", "overwrite", "power", "run_code", "send_email"],
-    # Arbeitsordner fuer Datei-Erstellung / Projekt-Scaffolding / Ausfuehrung. Relative Pfade
-    # der neuen Endpunkte sind IMMER relativ zu diesem Ordner (Pfad-Traversal-Schutz).
+    # Working folder for file creation / project scaffolding / execution. Relative paths of the
+    # new endpoints are ALWAYS relative to this folder (path-traversal protection).
     "workspace_dir": os.path.join(os.path.expanduser("~"), "OddvarkWorkspace"),
-    # Timeout (Sekunden) fuer run_command / run_file.
+    # Timeout (seconds) for run_command / run_file.
     "run_timeout_sec": 60,
 }
 
 
 def load_config():
-    cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # tiefe Kopie der Defaults
+    cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy of the defaults
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             user = json.load(f)
         for k, v in (user or {}).items():
             cfg[k] = v
-        print("[Aktion] config.json geladen: %s" % CONFIG_PATH)
+        print("[Action] config.json loaded: %s" % CONFIG_PATH)
     except FileNotFoundError:
-        print("[Aktion] keine config.json - nutze Defaults (siehe config.example.json)")
+        print("[Action] no config.json - using defaults (see config.example.json)")
     except Exception as e:
-        print("[Aktion] config.json fehlerhaft (%r) - nutze Defaults" % e)
+        print("[Action] config.json is malformed (%r) - using defaults" % e)
     return cfg
 
 
 CONFIG = load_config()
-# Vision-Modell: Umgebungsvariable schlaegt config.json schlaegt Default (qwen2.5vl:7b).
+# Vision model: environment variable overrides config.json overrides the default (qwen2.5vl:7b).
 if not os.environ.get("JARVIS_VISION_MODEL") and CONFIG.get("vision_model"):
     VISION_MODEL = str(CONFIG["vision_model"])
 APP_WHITELIST = CONFIG.get("app_whitelist", {})
@@ -132,7 +132,7 @@ ALLOWED_DOMAINS = CONFIG.get("allowed_domains", [])
 SMTP = CONFIG.get("smtp", {})
 CONFIRM_REQUIRED = set(CONFIG.get("confirm_required", []))
 
-# Arbeitsordner (Workspace) fuer Datei-/Projekt-/Ausfuehrungs-Aktionen.
+# Working folder (workspace) for file/project/execution actions.
 WORKSPACE_DIR = os.path.abspath(os.path.expanduser(
     CONFIG.get("workspace_dir") or os.path.join(os.path.expanduser("~"), "OddvarkWorkspace")))
 try:
@@ -142,24 +142,24 @@ except Exception:
 try:
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
 except Exception as _e:
-    print("[Aktion] Workspace konnte nicht angelegt werden (%r): %s" % (_e, WORKSPACE_DIR))
+    print("[Action] workspace could not be created (%r): %s" % (_e, WORKSPACE_DIR))
 else:
-    print("[Aktion] Workspace: %s" % WORKSPACE_DIR)
+    print("[Action] Workspace: %s" % WORKSPACE_DIR)
 
-# Python-Interpreter fuer run_file (laufender Interpreter, cross-platform).
+# Python interpreter for run_file (the running interpreter, cross-platform).
 _PYTHON = sys.executable or ("python" if IS_WIN else "python3")
 
 # ---------------------------------------------------------------------------
-# Confirm-Gate (Confirm-by-default)
+# Confirm gate (confirm-by-default)
 # ---------------------------------------------------------------------------
 PENDING = {}          # token -> {"label","summary","ts"}
-PENDING_TTL = 300.0   # Sekunden, die ein ausgestellter Bestaetigungs-Token gilt
+PENDING_TTL = 300.0   # seconds an issued confirmation token stays valid
 
 
 def need_confirm(label, data, summary, force=False):
-    """Gibt ein needs_confirm-Dict zurueck, falls Bestaetigung noetig und noch nicht erteilt;
-    sonst None (=> Aktion darf laufen). force=True erzwingt die Bestaetigung unabhaengig von der
-    config-Liste (harte Sicherheitsschranke fuer wirklich gefaehrliche Aktionen)."""
+    """Returns a needs_confirm dict if confirmation is required and not yet granted;
+    otherwise None (=> the action may run). force=True enforces confirmation regardless of the
+    config list (a hard safety barrier for truly dangerous actions)."""
     required = force or (label in CONFIRM_REQUIRED)
     if not required:
         return None
@@ -172,7 +172,7 @@ def need_confirm(label, data, summary, force=False):
             return None
     token = secrets.token_urlsafe(18)
     PENDING[token] = {"label": label, "summary": summary, "ts": time.time()}
-    # alte Tokens aufraeumen
+    # clean up old tokens
     if len(PENDING) > 200:
         now = time.time()
         for k in [k for k, r in PENDING.items() if now - r["ts"] > PENDING_TTL]:
@@ -184,21 +184,21 @@ def need_confirm(label, data, summary, force=False):
 # Domain-Allowlist
 # ---------------------------------------------------------------------------
 def normalize_url(url):
-    """Schemelose Eingaben (z. B. 'nike.com') zu einer https-URL machen.
-    Vorhandene Schemata (http:, file:, javascript:, mailto: …) bleiben unangetastet,
-    damit is_web_url() sie sauber ablehnen kann."""
+    """Turn scheme-less input (e.g. 'nike.com') into an https URL.
+    Existing schemes (http:, file:, javascript:, mailto: …) are left untouched,
+    so is_web_url() can reject them cleanly."""
     u = (url or "").strip()
     if not u:
         return ""
-    if re.match(r'^[a-zA-Z][a-zA-Z0-9+.\-]*:', u):   # hat bereits ein Schema
+    if re.match(r'^[a-zA-Z][a-zA-Z0-9+.\-]*:', u):   # already has a scheme
         return u
-    if u.startswith("//"):                            # protokoll-relativ
+    if u.startswith("//"):                            # protocol-relative
         return "https:" + u
-    return "https://" + u                             # schemelos -> https
+    return "https://" + u                             # scheme-less -> https
 
 
 def is_private_host(host):
-    """True für lokale/private/interne Hosts (SSRF-Schutz beim server-seitigen Lesen)."""
+    """True for local/private/internal hosts (SSRF protection for server-side reading)."""
     if not host:
         return True
     h = host.lower().strip("[]")
@@ -208,11 +208,11 @@ def is_private_host(host):
         ip = ipaddress.ip_address(h)
         return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast
     except ValueError:
-        return False  # normaler öffentlicher Hostname (keine IP)
+        return False  # normal public hostname (not an IP)
 
 
 def is_web_url(url):
-    """Nur http/https zulassen (blockiert file:, javascript:, data: …)."""
+    """Allow only http/https (blocks file:, javascript:, data: …)."""
     try:
         pr = urllib.parse.urlparse(url)
     except Exception:
@@ -221,7 +221,7 @@ def is_web_url(url):
 
 
 def domain_allowed(url):
-    # Leere Allowlist = keine Domain-Einschränkung (der SSRF-Schutz greift separat).
+    # Empty allowlist = no domain restriction (SSRF protection applies separately).
     if not ALLOWED_DOMAINS:
         return True
     try:
@@ -241,14 +241,14 @@ def domain_allowed(url):
             if host == base:
                 return True
         else:
-            # blanke Domain deckt auch ihre Subdomains ab
+            # a bare domain also covers its subdomains
             if host == p or fnmatch.fnmatch(host, "*." + p):
                 return True
     return False
 
 
 # ---------------------------------------------------------------------------
-# Aktions-Log (Secrets maskiert)
+# Action log (secrets masked)
 # ---------------------------------------------------------------------------
 LOG = []
 _SENS = ("pass", "pwd", "secret", "token", "key", "credential")
@@ -262,16 +262,16 @@ def _mask(obj):
             if any(s in kl for s in _SENS):
                 out[k] = "***"
             elif kl == "content" and isinstance(v, str):
-                out[k] = "<%d Zeichen>" % len(v)           # Datei-Inhalt nie voll loggen
+                out[k] = "<%d chars>" % len(v)             # never log full file content
             elif kl == "files" and isinstance(v, list):
-                out[k] = "<%d Datei(en)>" % len(v)         # Projekt-Dateien: nur Anzahl
+                out[k] = "<%d file(s)>" % len(v)           # project files: count only
             else:
                 out[k] = _mask(v)
         return out
     if isinstance(obj, (list, tuple)):
         return [_mask(x) for x in list(obj)[:20]]
     if isinstance(obj, str):
-        return obj if len(obj) <= 300 else obj[:300] + " ...(gekuerzt)"
+        return obj if len(obj) <= 300 else obj[:300] + " ...(truncated)"
     return obj
 
 
@@ -290,7 +290,7 @@ def log_action(action, args, status):
 
 
 # ---------------------------------------------------------------------------
-# Kleine Helfer
+# Small helpers
 # ---------------------------------------------------------------------------
 def _local_ip():
     try:
@@ -328,12 +328,12 @@ def _html_to_text(body, limit=4000):
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text).strip()
     if len(text) > limit:
-        text = text[:limit] + " ...(gekuerzt)"
+        text = text[:limit] + " ...(truncated)"
     return title, text
 
 
 def grab_png(max_width=1280):
-    """Screenshot des Primaerbildschirms als PNG-Bytes (auf max_width skaliert, spart Tokens)."""
+    """Screenshot of the primary display as PNG bytes (scaled to max_width to save tokens)."""
     if _HAS_PIL:
         from PIL import ImageGrab, Image
         img = ImageGrab.grab()
@@ -349,7 +349,7 @@ def grab_png(max_width=1280):
         with mss.mss() as sct:
             shot = sct.grab(sct.monitors[1])
             return mss.tools.to_png(shot.rgb, shot.size)
-    raise RuntimeError("Kein Screenshot moeglich - weder Pillow noch mss installiert.")
+    raise RuntimeError("No screenshot possible - neither Pillow nor mss is installed.")
 
 
 def ollama_vision(question, b64_png, timeout=300):
@@ -357,7 +357,7 @@ def ollama_vision(question, b64_png, timeout=300):
         "model": VISION_MODEL,
         "stream": False,
         "messages": [{"role": "user",
-                      "content": question or "Beschreibe praezise, was auf dem Bildschirm zu sehen ist.",
+                      "content": question or "Describe precisely what is visible on the screen.",
                       "images": [b64_png]}],
     }
     req = urllib.request.Request(OLLAMA_URL.rstrip("/") + "/api/chat",
@@ -369,7 +369,7 @@ def ollama_vision(question, b64_png, timeout=300):
 
 
 # ---------------------------------------------------------------------------
-# Windows: Media-Keys / Lautstaerke / Power
+# Windows: media keys / volume / power
 # ---------------------------------------------------------------------------
 VK = {
     "mute": 0xAD, "voldown": 0xAE, "volup": 0xAF,
@@ -384,20 +384,20 @@ def _tap_vk(vk):
 
 
 def set_volume(level):
-    """Absolute Lautstaerke 0..100 - stdlib-only via VK-Tasten (Schrittweite ~2%, daher ungefaehr)."""
+    """Absolute volume 0..100 - stdlib-only via VK keys (step size ~2%, hence approximate)."""
     if not IS_WIN:
-        raise RuntimeError("set_volume nur unter Windows implementiert.")
+        raise RuntimeError("set_volume is only implemented on Windows.")
     level = max(0, min(100, int(level)))
-    for _ in range(50):        # sicher auf 0 herunter
+    for _ in range(50):        # safely down to 0
         _tap_vk(VK["voldown"])
-    for _ in range(round(level / 2.0)):  # jeder Schritt hebt um ~2 %
+    for _ in range(round(level / 2.0)):  # each step raises by ~2 %
         _tap_vk(VK["volup"])
-    return {"ok": True, "level_approx": level, "note": "approx. (VK-Schrittweite ~2%)"}
+    return {"ok": True, "level_approx": level, "note": "approx. (VK step size ~2%)"}
 
 
 def do_power(action):
     if not IS_WIN:
-        raise RuntimeError("Power-Aktionen nur unter Windows implementiert.")
+        raise RuntimeError("Power actions are only implemented on Windows.")
     a = (action or "").lower()
     if a == "lock":
         ctypes.windll.user32.LockWorkStation()
@@ -410,18 +410,18 @@ def do_power(action):
     elif a == "hibernate":
         subprocess.Popen(["shutdown", "/h"])
     else:
-        raise ValueError("unbekannte power-Aktion: %r" % action)
+        raise ValueError("unknown power action: %r" % action)
     return {"ok": True, "action": a}
 
 
 # ---------------------------------------------------------------------------
-# pyautogui-Wrapper
+# pyautogui wrapper
 # ---------------------------------------------------------------------------
 def _pg():
     if not _HAS_PYAUTOGUI:
-        raise RuntimeError("pyautogui nicht installiert (pip install pyautogui).")
+        raise RuntimeError("pyautogui is not installed (pip install pyautogui).")
     import pyautogui
-    pyautogui.FAILSAFE = True   # Maus in Ecke oben-links bricht ab
+    pyautogui.FAILSAFE = True   # moving the mouse to the top-left corner aborts
     return pyautogui
 
 
@@ -440,12 +440,12 @@ def do_mouse(data):
     elif act == "scroll":
         pg.scroll(int(data.get("amount") or -300))
     else:
-        raise ValueError("unbekannte mouse-Aktion: %r" % act)
+        raise ValueError("unknown mouse action: %r" % act)
     return {"ok": True, "action": act}
 
 
 # ---------------------------------------------------------------------------
-# Systeminfo
+# System info
 # ---------------------------------------------------------------------------
 def system_info():
     info = {
@@ -456,7 +456,7 @@ def system_info():
         "python": platform.python_version(),
         "cpu_count": os.cpu_count(),
     }
-    # Disk (Systemlaufwerk) - stdlib
+    # Disk (system drive) - stdlib
     try:
         du = shutil.disk_usage(os.path.abspath(os.sep))
         info["disk"] = {"free_gb": round(du.free / 1e9, 1), "total_gb": round(du.total / 1e9, 1),
@@ -475,7 +475,7 @@ def system_info():
         except Exception:
             pass
     else:
-        info["note"] = "psutil nicht installiert - CPU%/RAM/Akku nicht verfuegbar (pip install psutil)."
+        info["note"] = "psutil not installed - CPU%/RAM/battery unavailable (pip install psutil)."
     return info
 
 
@@ -490,13 +490,13 @@ def network_info():
         except Exception:
             pass
     else:
-        out["note"] = "psutil fehlt - nur Hostname/lokale IP. Speedtest bewusst weggelassen (keine Lib)."
+        out["note"] = "psutil missing - hostname/local IP only. Speedtest deliberately omitted (no lib)."
     return out
 
 
 def hardware_scan():
-    """Hardware-Profil fuer Modell-Empfehlungen (read-only): CPU, RAM, GPU/VRAM.
-    Genutzt vom "PC scannen"-Button auf models.html, um passende LLM-Groessen/Quants zu bestimmen."""
+    """Hardware profile for model recommendations (read-only): CPU, RAM, GPU/VRAM.
+    Used by the "Scan PC" button on models.html to determine suitable LLM sizes/quants."""
     hw = {"platform": platform.platform()}
     # CPU (stdlib + optional psutil)
     cpu = {"name": platform.processor() or platform.machine(),
@@ -520,9 +520,9 @@ def hardware_scan():
         except Exception:
             pass
     if "ram" not in hw:
-        hw["note"] = "psutil fehlt - RAM unbekannt (pip install psutil)."
-    # GPU/VRAM degrade-clean: 1) nvidia-smi (echte VRAM-Zahlen), 2) Windows-CIM nur als Namens-
-    # Fallback (Win32_VideoController.AdapterRAM ist signed-32-bit und wrappt >4 GB -> keine Groesse).
+        hw["note"] = "psutil missing - RAM unknown (pip install psutil)."
+    # GPU/VRAM clean-degrade: 1) nvidia-smi (real VRAM numbers), 2) Windows CIM only as a name
+    # fallback (Win32_VideoController.AdapterRAM is signed 32-bit and wraps >4 GB -> no size).
     gpus = []
     flags = subprocess.CREATE_NO_WINDOW if IS_WIN else 0
     try:
@@ -567,12 +567,12 @@ def hardware_scan():
 
 
 # ---------------------------------------------------------------------------
-# Dateien
+# Files
 # ---------------------------------------------------------------------------
 def list_dir(path):
     path = os.path.abspath(os.path.expanduser(path or os.path.expanduser("~")))
     if not os.path.isdir(path):
-        raise FileNotFoundError("kein Verzeichnis: %s" % path)
+        raise FileNotFoundError("not a directory: %s" % path)
     entries = []
     for name in sorted(os.listdir(path)):
         full = os.path.join(path, name)
@@ -606,13 +606,13 @@ def search_files(root, query, limit):
 def organize_folder(path):
     path = os.path.abspath(os.path.expanduser(path))
     if not os.path.isdir(path):
-        raise FileNotFoundError("kein Verzeichnis: %s" % path)
+        raise FileNotFoundError("not a directory: %s" % path)
     moved = 0
     for name in os.listdir(path):
         full = os.path.join(path, name)
         if not os.path.isfile(full):
             continue
-        ext = (os.path.splitext(name)[1].lstrip(".") or "ohne_endung").lower()
+        ext = (os.path.splitext(name)[1].lstrip(".") or "no_extension").lower()
         sub = os.path.join(path, ext.upper())
         os.makedirs(sub, exist_ok=True)
         try:
@@ -627,7 +627,7 @@ def file_op(op, src, dst):
     op = (op or "").lower()
     src = os.path.abspath(os.path.expanduser(src or ""))
     if not os.path.exists(src):
-        raise FileNotFoundError("Quelle fehlt: %s" % src)
+        raise FileNotFoundError("source missing: %s" % src)
     if op == "delete":
         if os.path.isdir(src):
             shutil.rmtree(src)
@@ -636,7 +636,7 @@ def file_op(op, src, dst):
         return {"ok": True, "op": "delete", "src": src}
     dst = os.path.abspath(os.path.expanduser(dst or ""))
     if not dst:
-        raise ValueError("dst fehlt fuer op=%s" % op)
+        raise ValueError("dst missing for op=%s" % op)
     if op == "move":
         shutil.move(src, dst)
     elif op == "copy":
@@ -645,7 +645,7 @@ def file_op(op, src, dst):
         else:
             shutil.copy2(src, dst)
     else:
-        raise ValueError("unbekannte op: %r" % op)
+        raise ValueError("unknown op: %r" % op)
     return {"ok": True, "op": op, "src": src, "dst": dst}
 
 
@@ -659,8 +659,8 @@ def clipboard_get():
                                  capture_output=True, text=True, timeout=10)
             return out.stdout.rstrip("\r\n")
         except Exception as e:
-            raise RuntimeError("Zwischenablage nicht lesbar: %r" % e)
-    raise RuntimeError("pyperclip nicht installiert.")
+            raise RuntimeError("clipboard not readable: %r" % e)
+    raise RuntimeError("pyperclip is not installed.")
 
 
 def clipboard_set(text):
@@ -673,15 +673,15 @@ def clipboard_set(text):
         p = subprocess.Popen("clip", stdin=subprocess.PIPE, shell=True)
         p.communicate(input=text.encode("utf-16le"))
         return True
-    raise RuntimeError("pyperclip nicht installiert.")
+    raise RuntimeError("pyperclip is not installed.")
 
 
 # ---------------------------------------------------------------------------
-# Workspace: Datei-Erstellung / Projekt-Scaffolding / Ausfuehrung
+# Workspace: file creation / project scaffolding / execution
 # ---------------------------------------------------------------------------
 def _is_within(path, base):
-    """True, wenn 'path' innerhalb von 'base' liegt (beide werden absolut gemacht).
-    Auf Windows liefert commonpath bei verschiedenen Laufwerken eine ValueError -> False."""
+    """True if 'path' lies within 'base' (both are made absolute).
+    On Windows, commonpath raises ValueError for different drives -> False."""
     try:
         ap = os.path.abspath(path)
         ab = os.path.abspath(base)
@@ -691,27 +691,27 @@ def _is_within(path, base):
 
 
 def resolve_path(path):
-    """Loest 'path' zu einem absoluten Pfad auf. Rueckgabe (abspath, sensibel).
-    - RELATIVE Pfade sind relativ zum Workspace; ein Ausbruch via '..' wird abgelehnt
-      (ValueError -> Pfad-Traversal-Schutz). sensibel=False.
-    - ABSOLUTE Pfade (C:\\..., /home/...) sind erlaubt, gelten aber IMMER als sensibel
-      (sensibel=True -> die aufrufende Aktion verlangt dann eine Bestaetigung),
-      ausser sie liegen zufaellig innerhalb des Workspace."""
+    """Resolves 'path' to an absolute path. Returns (abspath, sensitive).
+    - RELATIVE paths are relative to the workspace; escaping via '..' is rejected
+      (ValueError -> path-traversal protection). sensitive=False.
+    - ABSOLUTE paths (C:\\..., /home/...) are allowed but ALWAYS count as sensitive
+      (sensitive=True -> the calling action then requires a confirmation),
+      unless they happen to lie inside the workspace."""
     raw = (path or "").strip()
     if not raw:
-        raise ValueError("kein Pfad angegeben")
+        raise ValueError("no path given")
     expanded = os.path.expanduser(raw)
     if os.path.isabs(expanded):
         ap = os.path.abspath(expanded)
         return ap, (not _is_within(ap, WORKSPACE_DIR))
     ap = os.path.abspath(os.path.join(WORKSPACE_DIR, expanded))
     if not _is_within(ap, WORKSPACE_DIR):
-        raise ValueError("Pfad-Traversal ausserhalb des Workspace ist nicht erlaubt: %s" % raw)
+        raise ValueError("path traversal outside the workspace is not allowed: %s" % raw)
     return ap, False
 
 
 def _file_url(path):
-    """Absoluter Pfad -> file://-URL (cross-platform via pathlib)."""
+    """Absolute path -> file:// URL (cross-platform via pathlib)."""
     try:
         return pathlib.Path(os.path.abspath(path)).as_uri()
     except Exception:
@@ -719,12 +719,12 @@ def _file_url(path):
 
 
 def _open_default(target):
-    """Datei/Ordner im Standardprogramm bzw. http(s)-URL im Browser oeffnen (OS-abhaengig)."""
+    """Open a file/folder in the default program, or an http(s) URL in the browser (OS-dependent)."""
     if re.match(r'^https?://', str(target), re.I):
         (os.startfile(target) if IS_WIN else webbrowser.open(target))
         return
     if IS_WIN:
-        os.startfile(target)                       # noqa: fuer .html/.exe = Standardhandler
+        os.startfile(target)                       # noqa: for .html/.exe = default handler
     elif sys.platform == "darwin":
         subprocess.Popen(["open", target])
     else:
@@ -732,7 +732,7 @@ def _open_default(target):
 
 
 def _write_text_file(ap, content):
-    """Schreibt Text (UTF-8), legt fehlende Ordner an, gibt geschriebene Byte-Anzahl zurueck."""
+    """Writes text (UTF-8), creates missing folders, returns the number of bytes written."""
     content = "" if content is None else (content if isinstance(content, str) else str(content))
     parent = os.path.dirname(ap)
     if parent:
@@ -743,10 +743,10 @@ def _write_text_file(ap, content):
 
 
 def list_workspace(sub):
-    """Ordnerinhalt (Dateien + Ordner mit Groesse) im Workspace auflisten."""
+    """List folder contents (files + folders with size) in the workspace."""
     ap = resolve_path(sub)[0] if (sub or "").strip() else WORKSPACE_DIR
     if not os.path.isdir(ap):
-        raise FileNotFoundError("kein Verzeichnis: %s" % ap)
+        raise FileNotFoundError("not a directory: %s" % ap)
     entries = []
     for name in sorted(os.listdir(ap)):
         full = os.path.join(ap, name)
@@ -760,8 +760,8 @@ def list_workspace(sub):
 
 
 def create_project(proj_dir, files, do_open):
-    """Legt mehrere Dateien unter proj_dir an. Gibt {ok,dir,files,[open_path,open_url,opened]} zurueck.
-    Wenn eine index.html dabei ist und do_open, wird sie im Standardbrowser geoeffnet."""
+    """Creates several files under proj_dir. Returns {ok,dir,files,[open_path,open_url,opened]}.
+    If an index.html is among them and do_open is set, it is opened in the default browser."""
     os.makedirs(proj_dir, exist_ok=True)
     written = []
     index_html = None
@@ -773,7 +773,7 @@ def create_project(proj_dir, files, do_open):
             continue
         target = os.path.abspath(os.path.join(proj_dir, os.path.expanduser(rel)))
         if not _is_within(target, proj_dir):
-            raise ValueError("Datei-Pfad verlaesst das Projektverzeichnis: %s" % rel)
+            raise ValueError("file path leaves the project directory: %s" % rel)
         b = _write_text_file(target, item.get("content"))
         written.append({"path": target, "bytes": b})
         if os.path.basename(target).lower() == "index.html" and index_html is None:
@@ -792,29 +792,29 @@ def create_project(proj_dir, files, do_open):
 
 
 def _dec(b, limit=8000):
-    """subprocess-Ausgabe (bytes) dekodieren + auf ~8000 Zeichen kuerzen."""
+    """Decode subprocess output (bytes) + truncate to ~8000 chars."""
     if b is None:
         return ""
     s = b.decode("utf-8", "replace") if isinstance(b, (bytes, bytearray)) else str(b)
     if len(s) > limit:
-        s = s[:limit] + " ...(gekuerzt)"
+        s = s[:limit] + " ...(truncated)"
     return s
 
 
 def run_command(command, cwd, timeout):
-    """Befehl per Shell ausfuehren (cross-platform shell=True). stdout/stderr gekuerzt + returncode."""
+    """Run a command via the shell (cross-platform shell=True). stdout/stderr truncated + returncode."""
     try:
         proc = subprocess.run(command, shell=True, cwd=cwd, capture_output=True, timeout=timeout)
     except subprocess.TimeoutExpired as e:
         return {"ok": False, "timeout": True, "returncode": None, "cwd": cwd,
                 "stdout": _dec(getattr(e, "stdout", b"")), "stderr": _dec(getattr(e, "stderr", b"")),
-                "note": "Timeout nach %s s" % timeout}
+                "note": "timeout after %s s" % timeout}
     return {"ok": (proc.returncode == 0), "returncode": proc.returncode, "cwd": cwd,
             "stdout": _dec(proc.stdout), "stderr": _dec(proc.stderr)}
 
 
 def _shquote(s):
-    """Argument fuer shell=True quoten (Windows: doppelte Anfuehrungszeichen; POSIX: shlex)."""
+    """Quote an argument for shell=True (Windows: double quotes; POSIX: shlex)."""
     s = str(s)
     if IS_WIN:
         return '"' + s.replace('"', '') + '"'
@@ -822,8 +822,8 @@ def _shquote(s):
 
 
 def run_file_cmd(ap, args):
-    """Baut aus Dateiendung + args den Ausfuehrungs-Befehl. Rueckgabe (cmd, kind).
-    kind: 'run' (ausfuehren via run_command) | 'open' (im Standardprogramm) | 'html' (Browser)."""
+    """Builds the execution command from the file extension + args. Returns (cmd, kind).
+    kind: 'run' (execute via run_command) | 'open' (in default program) | 'html' (browser)."""
     ext = os.path.splitext(ap)[1].lower()
     if not isinstance(args, (list, tuple)):
         args = [] if args in (None, "") else [args]
@@ -844,7 +844,7 @@ def run_file_cmd(ap, args):
 
 
 # ---------------------------------------------------------------------------
-# Apps starten / beenden
+# Launch / quit apps
 # ---------------------------------------------------------------------------
 def _launch(cmd):
     subprocess.Popen(cmd, shell=True)
@@ -870,7 +870,7 @@ def close_app(name):
 
 
 # ---------------------------------------------------------------------------
-# Agent-Loop (Sehen -> Handeln -> Verifizieren)
+# Agent loop (see -> act -> verify)
 # ---------------------------------------------------------------------------
 def _agent_execute(action, args):
     action = (action or "").lower()
@@ -889,32 +889,32 @@ def _agent_execute(action, args):
     if action == "open_app":
         tgt = APP_WHITELIST.get(args.get("name"))
         if not tgt:
-            return {"ok": False, "error": "app nicht in whitelist"}
+            return {"ok": False, "error": "app not in whitelist"}
         return open_app_known(tgt)
     if action in ("done", "wait", "none"):
         return {"ok": True, "noop": action}
-    return {"ok": False, "error": "unbekannte agent-Aktion: %r" % action}
+    return {"ok": False, "error": "unknown agent action: %r" % action}
 
 
 def agent_task(goal, max_steps):
     if not _HAS_PYAUTOGUI:
-        raise RuntimeError("agent_task braucht pyautogui (pip install pyautogui).")
+        raise RuntimeError("agent_task requires pyautogui (pip install pyautogui).")
     max_steps = max(1, min(12, int(max_steps or 6)))
-    deadline = time.time() + 120.0   # hartes Zeitlimit
+    deadline = time.time() + 120.0   # hard time limit
     steps = []
     for i in range(max_steps):
         if time.time() > deadline:
-            steps.append({"step": i, "aborted": "zeitlimit"})
+            steps.append({"step": i, "aborted": "time limit"})
             break
         b64 = base64.b64encode(grab_png()).decode("ascii")
         prompt = (
-            "Du steuerst einen Windows-PC per Maus/Tastatur. Ziel: %s\n"
-            "Analysiere den Screenshot und plane GENAU EINE naechste Aktion.\n"
-            "Antworte NUR mit JSON, ohne Erklaerung, in dieser Form:\n"
+            "You control a Windows PC with mouse/keyboard. Goal: %s\n"
+            "Analyze the screenshot and plan EXACTLY ONE next action.\n"
+            "Respond ONLY with JSON, no explanation, in this form:\n"
             "{\"action\":\"mouse|type|hotkey|press|open_app|done\",\"args\":{...},"
-            "\"done\":false,\"reason\":\"kurz\"}\n"
-            "Fuer mouse: args {\"action\":\"click|double|right|move|scroll\",\"x\":123,\"y\":456}. "
-            "Wenn das Ziel erreicht ist: action \"done\", done true." % goal
+            "\"done\":false,\"reason\":\"short\"}\n"
+            "For mouse: args {\"action\":\"click|double|right|move|scroll\",\"x\":123,\"y\":456}. "
+            "When the goal is reached: action \"done\", done true." % goal
         )
         try:
             content = ollama_vision(prompt, b64, timeout=180)
@@ -929,7 +929,7 @@ def agent_task(goal, max_steps):
             except Exception:
                 plan = {}
         if not plan:
-            steps.append({"step": i, "raw": content[:400], "error": "kein JSON-Plan"})
+            steps.append({"step": i, "raw": content[:400], "error": "no JSON plan"})
             break
         rec = {"step": i, "action": plan.get("action"), "args": _mask(plan.get("args")),
                "reason": plan.get("reason")}
@@ -945,17 +945,17 @@ def agent_task(goal, max_steps):
             steps.append(rec)
             break
         steps.append(rec)
-        time.sleep(0.6)  # UI Zeit geben zu reagieren
+        time.sleep(0.6)  # give the UI time to react
     return {"ok": True, "goal": goal, "steps": steps}
 
 
 # ---------------------------------------------------------------------------
-# E-Mail (stdlib smtplib) - optional, nur wenn smtp konfiguriert
+# Email (stdlib smtplib) - optional, only when smtp is configured
 # ---------------------------------------------------------------------------
 def send_email(to, subject, body):
     host = SMTP.get("host")
     if not host:
-        raise RuntimeError("SMTP nicht konfiguriert (config.json -> smtp.host).")
+        raise RuntimeError("SMTP not configured (config.json -> smtp.host).")
     import smtplib
     from email.message import EmailMessage
     msg = EmailMessage()
@@ -989,13 +989,13 @@ def capabilities():
         },
         "features": {
             "system_info": True,
-            "hardware": True,   # /hardware: CPU/RAM/GPU-Scan fuer Modell-Empfehlungen
+            "hardware": True,   # /hardware: CPU/RAM/GPU scan for model recommendations
             "screenshot": _HAS_PIL or _HAS_MSS,
             "mouse_keyboard": _HAS_PYAUTOGUI,
             "clipboard": _HAS_PYPERCLIP or IS_WIN,
             "media_keys": IS_WIN,
             "power": IS_WIN,
-            "vision": _HAS_PIL or _HAS_MSS,   # braucht zusaetzlich laufendes Ollama
+            "vision": _HAS_PIL or _HAS_MSS,   # additionally needs a running Ollama
             "agent_task": _HAS_PYAUTOGUI and (_HAS_PIL or _HAS_MSS),
             "email": bool(SMTP.get("host")),
             "file_ops": True,     # write_file/read_file/list_workspace/create_project/open_path
@@ -1010,7 +1010,7 @@ def capabilities():
 
 
 # ---------------------------------------------------------------------------
-# HTTP-Handler
+# HTTP handler
 # ---------------------------------------------------------------------------
 SKIP_LOG = {"/health", "/capabilities", "/log"}
 
@@ -1089,7 +1089,7 @@ class Handler(BaseHTTPRequestHandler):
                 r = list_workspace(one("path"))
                 self._logged(p, dict(qs), r)
                 return self._send(200, r)
-            return self._send(404, {"error": "nicht gefunden: %s" % p})
+            return self._send(404, {"error": "not found: %s" % p})
         except Exception as e:
             self._logged(p, dict(qs), {"error": repr(e)})
             return self._send(500, {"error": repr(e)})
@@ -1104,7 +1104,7 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(data, dict):
                 data = {}
         except Exception as e:
-            return self._send(400, {"error": "ungueltiger JSON-Body: %r" % e})
+            return self._send(400, {"error": "invalid JSON body: %r" % e})
 
         try:
             code, obj = self._route_post(p, data)
@@ -1118,7 +1118,7 @@ class Handler(BaseHTTPRequestHandler):
         # ---- Apps ----
         if p == "/open_app":
             name = data.get("name")
-            # case-insensitive Whitelist-Lookup
+            # case-insensitive whitelist lookup
             target = APP_WHITELIST.get(name)
             if target is None:
                 for k, v in APP_WHITELIST.items():
@@ -1149,9 +1149,9 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/media_key":
             key = (data.get("key") or "").lower()
             if key not in VK:
-                return 400, {"error": "unbekannte media_key: %r" % key, "valid": list(VK.keys())}
+                return 400, {"error": "unknown media_key: %r" % key, "valid": list(VK.keys())}
             if not IS_WIN:
-                return 400, {"error": "media_key nur unter Windows."}
+                return 400, {"error": "media_key is Windows-only."}
             _tap_vk(VK[key])
             return 200, {"ok": True, "key": key}
         if p == "/power":
@@ -1164,35 +1164,35 @@ class Handler(BaseHTTPRequestHandler):
         # ---- Maus / Tastatur ----
         if p == "/mouse":
             if not _HAS_PYAUTOGUI:
-                return 200, {"error": "pyautogui nicht installiert", "hint": "pip install pyautogui"}
+                return 200, {"error": "pyautogui is not installed", "hint": "pip install pyautogui"}
             return 200, do_mouse(data)
         if p == "/type":
             if not _HAS_PYAUTOGUI:
-                return 200, {"error": "pyautogui nicht installiert", "hint": "pip install pyautogui"}
+                return 200, {"error": "pyautogui is not installed", "hint": "pip install pyautogui"}
             _pg().typewrite(str(data.get("text", "")), interval=0.02)
             return 200, {"ok": True}
         if p == "/hotkey":
             if not _HAS_PYAUTOGUI:
-                return 200, {"error": "pyautogui nicht installiert", "hint": "pip install pyautogui"}
+                return 200, {"error": "pyautogui is not installed", "hint": "pip install pyautogui"}
             _pg().hotkey(*[str(k) for k in (data.get("keys") or [])])
             return 200, {"ok": True}
         if p == "/press":
             if not _HAS_PYAUTOGUI:
-                return 200, {"error": "pyautogui nicht installiert", "hint": "pip install pyautogui"}
+                return 200, {"error": "pyautogui is not installed", "hint": "pip install pyautogui"}
             _pg().press(str(data.get("key", "")))
             return 200, {"ok": True}
 
-        # ---- Dateien ----
+        # ---- Files ----
         if p == "/open_file":
             path = os.path.abspath(os.path.expanduser(data.get("path") or ""))
             if not os.path.exists(path):
-                return 404, {"error": "Datei fehlt: %s" % path}
+                return 404, {"error": "file missing: %s" % path}
             (os.startfile(path) if IS_WIN else subprocess.Popen(["xdg-open", path]))
             return 200, {"ok": True, "opened": path}
         if p == "/open_folder":
             path = os.path.abspath(os.path.expanduser(data.get("path") or ""))
             if not os.path.isdir(path):
-                return 404, {"error": "Ordner fehlt: %s" % path}
+                return 404, {"error": "folder missing: %s" % path}
             (os.startfile(path) if IS_WIN else subprocess.Popen(["xdg-open", path]))
             return 200, {"ok": True, "opened": path}
         if p == "/organize_folder":
@@ -1217,7 +1217,7 @@ class Handler(BaseHTTPRequestHandler):
             clipboard_set(data.get("text", ""))
             return 200, {"ok": True}
 
-        # ---- Workspace: Datei-Erstellung / Projekt / Ausfuehrung ----
+        # ---- Workspace: file creation / project / execution ----
         if p == "/write_file":
             try:
                 ap, sensitive = resolve_path(data.get("path"))
@@ -1244,7 +1244,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return 400, {"error": str(e)}
             if not os.path.isfile(ap):
-                return 404, {"error": "Datei fehlt: %s" % ap}
+                return 404, {"error": "file missing: %s" % ap}
             limit = 200 * 1024
             with open(ap, "rb") as f:
                 raw = f.read(limit + 1)
@@ -1256,10 +1256,10 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/create_project":
             name = (data.get("name") or "").strip()
             if not name:
-                return 400, {"error": "kein Projektname angegeben"}
+                return 400, {"error": "no project name given"}
             files = data.get("files")
             if not isinstance(files, list) or not files:
-                return 400, {"error": "keine Dateien angegeben (files:[{path,content}])"}
+                return 400, {"error": "no files given (files:[{path,content}])"}
             try:
                 proj_dir, sensitive = resolve_path(name)
             except ValueError as e:
@@ -1275,7 +1275,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/run_command":
             command = str(data.get("command") or "")
             if not command.strip():
-                return 400, {"error": "kein Befehl angegeben"}
+                return 400, {"error": "no command given"}
             cwd_raw = data.get("cwd")
             try:
                 cwd = resolve_path(cwd_raw)[0] if cwd_raw else WORKSPACE_DIR
@@ -1296,10 +1296,10 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return 400, {"error": str(e)}
             if not os.path.isfile(ap):
-                return 404, {"error": "Datei fehlt: %s" % ap}
+                return 404, {"error": "file missing: %s" % ap}
             cmd, kind = run_file_cmd(ap, data.get("args"))
             if kind == "html":
-                _open_default(ap)   # .html nur im Browser oeffnen (kein "ausfuehren", kein Confirm)
+                _open_default(ap)   # only open .html in the browser (no "execute", no confirm)
                 return 200, {"ok": True, "opened": ap, "url": _file_url(ap)}
             if kind == "open":
                 g = need_confirm("run_file", data,
@@ -1319,7 +1319,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/open_path":
             raw = (data.get("path") or "").strip()
             if not raw:
-                return 400, {"error": "kein Pfad angegeben"}
+                return 400, {"error": "no path given"}
             if re.match(r'^https?://', raw, re.I):
                 _open_default(raw)
                 return 200, {"ok": True, "opened": raw}
@@ -1328,35 +1328,35 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return 400, {"error": str(e)}
             if not os.path.exists(ap):
-                return 404, {"error": "Pfad fehlt: %s" % ap}
+                return 404, {"error": "path missing: %s" % ap}
             _open_default(ap)
             return 200, {"ok": True, "opened": ap}
 
         # ---- Browser ----
         if p == "/open_url":
-            # Eine Website im EIGENEN Browser öffnen ist harmlos -> keine Allowlist, nur http/https.
+            # Opening a website in the user's OWN browser is harmless -> no allowlist, http/https only.
             url = normalize_url(data.get("url") or "")
             if not is_web_url(url):
-                return 200, {"error": "keine gueltige Web-Adresse (nur http/https)", "url": url}
+                return 200, {"error": "not a valid web address (http/https only)", "url": url}
             (os.startfile(url) if IS_WIN else webbrowser.open(url))
             return 200, {"ok": True, "opened": url}
         if p == "/browse_page":
-            # Server-seitiges Lesen: öffentliche Hosts (SSRF-Schutz) + optionale Allowlist.
+            # Server-side reading: public hosts (SSRF protection) + optional allowlist.
             url = normalize_url(data.get("url") or "")
             if not is_web_url(url) or is_private_host(urllib.parse.urlparse(url).hostname):
-                return 200, {"error": "URL nicht erlaubt (nur oeffentliche http/https-Adressen)", "url": url}
+                return 200, {"error": "URL not allowed (public http/https addresses only)", "url": url}
             if not domain_allowed(url):
                 return 200, {"error": "domain not allowed", "url": url, "allowed": ALLOWED_DOMAINS}
             try:
                 body = _fetch_text(url)
             except Exception as e:
-                return 502, {"error": "fetch fehlgeschlagen: %r" % e}
+                return 502, {"error": "fetch failed: %r" % e}
             title, text = _html_to_text(body)
             return 200, {"title": title, "text": text, "url": url}
         if p == "/browser_act":
             url = normalize_url(data.get("url") or "")
             if not is_web_url(url) or is_private_host(urllib.parse.urlparse(url).hostname):
-                return 200, {"error": "URL nicht erlaubt (nur oeffentliche http/https-Adressen)", "url": url}
+                return 200, {"error": "URL not allowed (public http/https addresses only)", "url": url}
             if not domain_allowed(url):
                 return 200, {"error": "domain not allowed", "url": url}
             g = need_confirm("browser_act", data,
@@ -1364,11 +1364,11 @@ class Handler(BaseHTTPRequestHandler):
                              % (url, len(data.get("steps") or [])), force=True)
             if g:
                 return 200, g
-            # Ehrlicher Platzhalter: schreibende CDP-Steuerung ist Phase 2, nicht gefaket.
-            return 501, {"error": "browser_act (schreibende Interaktion) ist noch nicht implementiert.",
+            # Honest placeholder: writing CDP control is Phase 2, not faked.
+            return 501, {"error": "browser_act (write interaction) is not implemented yet.",
                          "phase": 2,
-                         "hinweis": "Geplant via Chrome DevTools Protocol (headed Chrome mit "
-                                    "--remote-debugging-port). Nutze bis dahin open_url + browse_page.",
+                         "hint": "Planned via Chrome DevTools Protocol (headed Chrome with "
+                                    "--remote-debugging-port). Until then use open_url + browse_page.",
                          "received_steps": data.get("steps")}
 
         # ---- Vision & Agent ----
@@ -1381,7 +1381,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 answer = ollama_vision(data.get("question"), b64, timeout=int(data.get("timeout") or 300))
             except Exception as e:
-                return 502, {"error": "Ollama nicht erreichbar oder Fehler: %r" % e,
+                return 502, {"error": "Ollama unreachable or error: %r" % e,
                              "model": VISION_MODEL}
             return 200, {"answer": answer, "model": VISION_MODEL}
         if p == "/agent_task":
@@ -1401,9 +1401,9 @@ class Handler(BaseHTTPRequestHandler):
                 return 200, g
             return 200, send_email(data.get("to"), data.get("subject"), data.get("body"))
 
-        return 404, {"error": "nicht gefunden: %s" % p}
+        return 404, {"error": "not found: %s" % p}
 
-    # ---- Logging-Helfer ----
+    # ---- Logging helper ----
     def _logged(self, path, data, obj):
         if path in SKIP_LOG:
             return
@@ -1416,14 +1416,14 @@ class Handler(BaseHTTPRequestHandler):
         log_action(path, data, status)
 
     def log_message(self, fmt, *args):
-        print("[Aktion] " + (fmt % args))
+        print("[Action] " + (fmt % args))
 
 
 def main():
-    print("Oddvark Aktions-Server auf http://%s:%d  (Beenden: Strg+C)" % (HOST, PORT))
+    print("Oddvark action server on http://%s:%d  (Quit: Ctrl+C)" % (HOST, PORT))
     caps = capabilities()["libs"]
-    print("[Aktion] Libs: " + ", ".join("%s=%s" % (k, v) for k, v in caps.items()))
-    print("[Aktion] Log-Datei: %s" % LOG_FILE)
+    print("[Action] Libs: " + ", ".join("%s=%s" % (k, v) for k, v in caps.items()))
+    print("[Action] Log file: %s" % LOG_FILE)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
 
 

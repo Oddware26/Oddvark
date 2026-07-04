@@ -1,10 +1,9 @@
-/* Oddvark / Oddware – eigenes Fundament-Stylesheet.
-   Enthält: Rubik-Fonts, Design-Tokens (dunkel), Basis (html/body), Layout-Gerüst
-   (Sidebar/Content) und die wenigen genutzten Utility-Klassen. Von Grund auf geschrieben;
-   Farb-/Maßwerte sind am gerenderten Zustand abgemessen. Wird von index.html UND models.html
-   geladen. */
+/* Oddvark / Oddware – custom foundation stylesheet.
+   Contains: Rubik fonts, design tokens (dark), base (html/body), layout scaffold
+   (sidebar/content) and the few utility classes in use. Written from scratch;
+   color/size values are measured off the rendered state. Loaded by index.html AND models.html. */
 
-/* ---------- Rubik (Open Font License, lokal gebündelt) ---------- */
+/* ---------- Rubik (Open Font License, bundled locally) ---------- */
 @font-face {
   font-family: "Rubik"; src: url(../fonts/rubik-latin.woff2) format("woff2");
   font-weight: 300 900; font-style: normal; font-display: swap;
@@ -30,7 +29,7 @@
   font-weight: 400; font-style: normal;
 }
 
-/* ---------- Design-Tokens (dunkles Schema, immer aktiv) ---------- */
+/* ---------- Design tokens (dark scheme, always active) ---------- */
 :root {
   --font-ui-sans: "Rubik", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-ui-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
@@ -38,7 +37,7 @@
   --font-mono: var(--font-ui-mono);
   --font-open-dyslexic: "OpenDyslexic", "Comic Sans MS", ui-serif, serif;
 
-  /* Hintergrund- und Textrampen (HSL-Tripel -> hsl(var(--x)) bzw. mit /alpha) */
+  /* Background and text ramps (HSL triplets -> hsl(var(--x)) or with /alpha) */
   --bg-000: 60 2% 12%;
   --bg-100: 60 2% 8%;
   --bg-200: 60 2% 6%;
@@ -54,7 +53,7 @@
   --border-100: 53 12% 87%;
   --oncolor-100: 0 0% 100%;
 
-  /* Vollfarb-Tokens */
+  /* Full-color tokens */
   --accent: #09f;
   --accent-10: rgba(0, 153, 255, 0.1);
   --core-red: #ff3a30;
@@ -67,10 +66,10 @@
   --danger-000: 0 77% 81%;
   --danger-100: 0 73% 59%;
 
-  /* Radien */
+  /* Radii */
   --r5: 6px; --r6: 8px; --r7: 16px; --r8: 12px;
 
-  /* Weiß-Overlays (Fills / Trennlinien) */
+  /* White overlays (fills / dividers) */
   --fill-uncontained-default: hsl(0 0% 100% / 0);
   --fill-uncontained-hover: hsl(0 0% 100% / 0.08);
   --fill-uncontained-selected: hsl(0 0% 100% / 0.12);
@@ -79,7 +78,7 @@
   --t6: hsl(0 0% 100% / 0.48);
   --t7: hsl(0 0% 100% / 0.7);
 
-  /* Sidebar/Reihen-Metrik (df-*) */
+  /* Sidebar/row metrics (df-*) */
   --df-hover: hsl(0 0% 100% / 0.05);
   --df-selected: hsl(0 0% 100% / 0.1);
   --df-row-h: 26px;
@@ -96,7 +95,7 @@
   --df-sidebar-width: 288px;
   --df-sidebar-bg: 0 0% 10.6%;
 
-  /* Chat-Abstände / Icon-Größen / Spacing-Skala */
+  /* Chat spacing / icon sizes / spacing scale */
   --chat-item-gap: 9px;
   --chat-turn-gap: 14px;
   --class-small-icon: 12px;
@@ -108,12 +107,12 @@
   --hero-hue: 265;
 }
 
-/* ---------- Basis ---------- */
+/* ---------- Base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
-/* Reset für Formular-/Interaktions-Elemente (ersetzt den früheren globalen Preflight-Reset).
-   Ohne ihn zeigen native <button> ihre graue UA-Fläche + einen Default-Rahmen –
-   z. B. als „weißer Kasten" hinter Icon-Buttons wie dem Lautsprecher. Eigene Komponenten-Klassen
-   (.jv-*, .mdl-*) setzen ihre eigene Fläche und überschreiben diesen Reset. */
+/* Reset for form / interaction elements (replaces the former global preflight reset).
+   Without it, native <button> shows its gray UA surface + a default border –
+   e.g. as a "white box" behind icon buttons like the speaker. Custom component classes
+   (.jv-*, .mdl-*) set their own surface and override this reset. */
 button, input, optgroup, select, textarea {
   font: inherit;
   color: inherit;
@@ -146,10 +145,10 @@ body {
 }
 .hidden { display: none !important; }
 
-/* ---------- Layout-Gerüst (Sidebar links, Content rechts) ----------
-   app.css setzt html.h-screen{zoom:1.25; height:80vh} + body{height:80vh}, damit alles 25% größer
-   wird und trotzdem auf einen Bildschirm passt (80vh × 1.25 = volle Viewport-Höhe). Die App-Shell
-   muss darum ebenfalls 80vh hoch sein – sonst reißt die Höhen-Kette und der Composer läuft unten raus. */
+/* ---------- Layout scaffold (sidebar left, content right) ----------
+   app.css sets html.h-screen{zoom:1.25; height:80vh} + body{height:80vh} so everything gets 25% larger
+   and still fits on one screen (80vh × 1.25 = full viewport height). The app shell
+   must therefore also be 80vh tall – otherwise the height chain breaks and the composer overflows at the bottom. */
 .epitaxy-root {
   height: 80vh;
   max-height: 80vh;
@@ -194,7 +193,7 @@ body {
   padding-left: calc(var(--df-sidebar-width, 288px) + 16px);
 }
 
-/* ---------- Utilities (die im HTML/JS noch genutzt werden) ---------- */
+/* ---------- Utilities (still used in the HTML/JS) ---------- */
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .min-w-0 { min-width: 0; }
 .overflow-y-auto { overflow-y: auto; }
