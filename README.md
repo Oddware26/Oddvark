@@ -7,6 +7,12 @@ Jarvis pairs a polished chat interface with a fully local AI backend. It chats a
 🔒 **100% local processing. No cloud, no API keys, no subscriptions, no telemetry. Your data never leaves your machine.**
 
 <p align="center">
+  <a href="https://discord.gg/VSe7CpmJWG"><img src="https://img.shields.io/badge/Discord-join_the_Oddware_community-5865F2?logo=discord&logoColor=white" alt="Join the Oddware community on Discord"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a3be8c" alt="MIT license"></a>
+  <a href="https://ollama.com"><img src="https://img.shields.io/badge/powered_by-Ollama-222222" alt="Powered by Ollama"></a>
+</p>
+
+<p align="center">
   <img src="docs/images/chat.png" alt="Jarvis — a fully local AI chat with Markdown-rich answers" width="90%">
 </p>
 
@@ -245,6 +251,12 @@ MIT © 2026 [Oddware](https://github.com/Oddware26) — free for everyone, forev
 
 Built on local, open-source models via [Ollama](https://ollama.com), with Whisper, XTTS, and Z-Image powering the speech and image features. Bundles the [Rubik](https://github.com/googlefonts/rubik) and [OpenDyslexic](https://opendyslexic.org) fonts (SIL Open Font License) and [Hugeicons Free](https://hugeicons.com) icons (MIT) — full attributions in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). Your data stays on your machine.
 
-## 💬 Support
+## 💬 Community & support
 
-[Report an issue](https://github.com/Oddware26/Jarvis/issues) — bug reports, feature ideas, and contributions are all welcome.
+Join the **Oddware** Discord — get help, show what you built with Jarvis, and shape what comes next:
+
+<p align="center">
+  <a href="https://discord.gg/VSe7CpmJWG"><img src="https://discord.com/api/guilds/1523026404944380154/widget.png?style=banner2" alt="Join the Oddware Discord server"></a>
+</p>
+
+Prefer GitHub? [Report an issue](https://github.com/Oddware26/Jarvis/issues) — bug reports, feature ideas, and contributions are all welcome.
